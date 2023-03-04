@@ -2,8 +2,9 @@
   (:require [wkok.openai-clojure.api :as oai]))
 
 (defn get-reply
-  [context input]
+  ([context input] (get-reply context "Other" input)) ; Default speaker name is "Other"
+  ([context speaker input]
   (oai/create-completion {:model "text-davinci-003"
-                          :prompt (str context "\n[Other]:" input "\n[Me]:")
+                          :prompt (format "%s\n[%s]:%s\n[Me]:" context speaker input)
                           :max-tokens 30
-                          :temperature 0}))
+                          :temperature 0})))
