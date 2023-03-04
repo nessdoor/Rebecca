@@ -5,6 +5,6 @@
 (defn get-reply
   [context input]
   (oai/create-completion {:model "text-davinci-003"
-                          :prompt (cstr/join "\n[Other]: " (list context input))
+                          :prompt (cstr/join (list context "\n[Other]:" input "\n[Me]:"))
                           :max-tokens 30
                           :temperature 0}))
