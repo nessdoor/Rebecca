@@ -8,6 +8,19 @@
 
 (def default-agent-name "Me")
 
+(defn cprime
+  [intro participants]
+  (str
+   intro
+   "\nWhat follows is a conversation between " default-agent-name " and " participants "."))
+
+(defn +facts
+  [history facts] (str default-agent-name " knows that: " facts))
+
+(defn +input
+  ([history input] (+input history default-speaker-name input))
+  ([history speaker input] (str history (format "\n[%s]:%s" speaker input))))
+
 (defn epsilon-extend
   [history & {:as model-params}]
   (oai/create-completion
