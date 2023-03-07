@@ -6,7 +6,7 @@
 
 (def default-speaker-name "Other")
 
-(def default-agent-name "Me")
+(def default-agent-name "Rebecca")
 
 (defn cprime
   [intro participants]
