@@ -31,6 +31,8 @@
 
 (defn get-reply
   [context input & {:keys [speaker] :or {speaker default-speaker-name} :as extra}]
-  (epsilon-extend
-   (format "%s\n[%s]:%s" context speaker input)
-   (dissoc extra :speaker)))         ; Pass extra parameters to API w/o :speaker
+  (->
+   context
+   (+input speaker input)
+   (epsilon-extend
+    (dissoc extra :speaker))))         ; Pass extra parameters to API w/o :speaker
