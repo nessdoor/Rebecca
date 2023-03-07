@@ -24,9 +24,10 @@
 (defn epsilon-extend
   [history & {:as model-params}]
   (oai/create-completion
-   (assoc default-parameters
-          :prompt (str history
-                       (format "\n[%s]:" default-agent-name)))))
+   (merge default-parameters
+          model-params
+          {:prompt (str history
+                        (format "\n[%s]:" default-agent-name))})))
 
 (defn get-reply
   [context input & {:keys [speaker] :or {speaker default-speaker-name} :as extra}]
