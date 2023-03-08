@@ -9,10 +9,10 @@
                          :temperature 0})
 
 (defn cprime
-  [intro participants]
+  [intro & {:keys [parts agent] :or {parts default-speaker agent default-agent}}]
   (str
    intro
-   "\nWhat follows is a conversation between " default-agent " and " participants "."))
+   "\nWhat follows is a conversation between " agent " and " parts "."))
 
 (defn +facts
   [history facts] (str default-agent " knows that: " facts))
