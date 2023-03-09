@@ -1,5 +1,6 @@
 (ns rebecca.core
-  (:require [wkok.openai-clojure.api :as oai]))
+  (:require [wkok.openai-clojure.api :as oai])
+  (:import java.time.Instant))
 
 (def default-speaker "Other")
 
@@ -9,10 +10,17 @@
                          :temperature 0})
 
 (defn cprime
-  [intro & {:keys [parts agent] :or {parts default-speaker agent default-agent}}]
-  (str
-   intro
-   "\nWhat follows is a conversation between " agent " and " parts "."))
+  [intro & {:keys [participants agent]
+            :or {participants default-speaker agent default-agent}}]
+  (let [init-text
+        (str intro
+             "\nWhat follows is a conversation between " agent " and " participants ".")]
+    (with-meta
+      {:model agent :text init-text}     ; The context itself
+      {:primer [0 (count init-text)]     ; Text range containing the intro
+       :last-modified-time (Instant/now) ; Timestamp of last input/output
+       :segments              ; Queue containing the ranges of discrete messages
+       clojure.lang.PersistentQueue/EMPTY})))
 
 (defn +facts
   [history facts] (str default-agent " knows that: " facts))
