@@ -9,7 +9,7 @@
 (def default-parameters {:model "text-davinci-003"
                          :temperature 0})
 
-(defn cprime
+(defn context
   [intro & {:keys [participants agent]
             :or {participants default-speaker agent default-agent}}]
   (let [init-text
