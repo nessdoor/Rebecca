@@ -19,8 +19,30 @@
       {:model agent :text init-text}     ; The context itself
       {:primer [0 (count init-text)]     ; Text range containing the intro
        :last-modified-time (Instant/now) ; Timestamp of last input/output
-       :segments              ; Queue containing the ranges of discrete messages
+       :segments              ; Queue containing the length of each discrete message
        clojure.lang.PersistentQueue/EMPTY})))
+
+(defn update-context-meta
+  [ctxt-meta segment]
+  (let [seg-queue (ctxt-meta :segments)
+        new-text (segment :text)        ; New text contained in the segment
+        seg-meta (meta segment)]
+    (merge ctxt-meta
+           ;; Enqueue length of the new text
+           {:segments (conj seg-queue (count new-text))}
+           ;; Eventually update modification time with segment creation time
+           (when (contains? seg-meta :creation-time)
+             {:last-modified-time (seg-meta :creation-time)}))))
+
+(defn ccat
+  [ctxt segment]
+  (let [prev-text (ctxt :text)        ; Text currently being part of the context
+        seg-text (segment :text)]     ; New text to be added
+    ;; Generate a new context with updated metadata
+    (vary-meta
+     (assoc ctxt
+            :text (str prev-text seg-text)) ; Concatenate new text to context
+     update-context-meta segment)))         ; Generate updated metadata with helper function
 
 (defn +facts
   [history facts] (str default-agent " knows that: " facts))
