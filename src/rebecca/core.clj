@@ -17,7 +17,7 @@
              "\nWhat follows is a conversation between " agent " and " participants ".")]
     (with-meta
       {:model agent :text init-text}     ; The context itself
-      {:primer [0 (count init-text)]     ; Text range containing the intro
+      {:primer (count init-text)         ; Length of the introductory text
        :last-modified-time (Instant/now) ; Timestamp of last input/output
        :segments              ; Queue containing the length of each discrete message
        clojure.lang.PersistentQueue/EMPTY})))
