@@ -74,14 +74,23 @@
   (ccat ctxt {:text (str (make-prompt sp ctime) input)
               :creation-time ctime}))
 
+(defn try-complete
+  [text & {:as model-params}]
+  (oai/create-completion
+   (merge default-parameters model-params {:prompt text})))
+
 (defn epsilon-extend
   [ctxt & {:as model-params}]
-  (let [{:keys [agent-name]} ctxt
-        curr-time (Instant/now)
-        prompt (str (ctxt :text)
-                    (make-prompt agent-name curr-time))]
-    (oai/create-completion
-     (merge default-parameters model-params {:prompt prompt}))))
+  (let [{aname :agent-name ctext :text} ctxt
+        nowt (Instant/now)
+        aprompt (make-prompt aname nowt)        ; Chat prompt for the agent
+        tbc (str ctext aprompt)                 ; Text sent to the API
+        answer (try-complete tbc model-params)  ; Answer from the API
+        {:keys [choices]} answer                ; Completion candidates
+        {completion :text} (first choices)]     ; First completion text candidate
+    ;; First return value is the completion, while second is the extended context
+    [completion
+     (ccat ctxt {:text (str aprompt completion) :creation-time nowt})]))
 
 (defn get-reply
   [context input & {:keys [speaker] :or {speaker default-speaker} :as extra}]
