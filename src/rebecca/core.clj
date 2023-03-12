@@ -1,6 +1,7 @@
 (ns rebecca.core
   (:require [wkok.openai-clojure.api :as oai])
-  (:import java.time.Instant))
+  (:import java.time.Instant
+           java.time.DateTimeException))
 
 (def default-speaker "Other")
 
@@ -16,35 +17,45 @@
         (str intro
              "\nWhat follows is a conversation between " agent " and " participants ".")]
     (with-meta
-      {:model agent :text init-text}     ; The context itself
-      {:primer (count init-text)         ; Length of the introductory text
-       :last-modified-time (Instant/now) ; Timestamp of last input/output
-       :segments              ; Queue containing the length of each discrete message
+      ;; The context itself
+      {:model agent                       ; Name of the agent
+       :text init-text                    ; Introductory text
+       :last-modified-time (Instant/now)} ; Timestamp of last received/produced info
+      ;; Metadata
+      {:primer (count init-text)          ; Length of the introductory text
+       :segments                          ; Queue containing the length of each discrete message
        clojure.lang.PersistentQueue/EMPTY})))
 
 (defn update-context-meta
   [ctxt-meta segment]
-  (let [seg-queue (ctxt-meta :segments)
-        ctxt-time (ctxt-meta :last-modified-time)
-        new-text (segment :text)        ; New text contained in the segment
-        seg-meta (meta segment)]
+  (let [ctxt-queue (ctxt-meta :segments)
+        new-text (segment :text)]       ; New text contained in the segment
     (merge ctxt-meta
-           ;; Enqueue length of the new text
-           {:segments (conj seg-queue (count new-text))}
-           ;; If newer, overwrite context modification time with segment creation time
-           (when (and (contains? seg-meta :creation-time)
-                      (.isAfter (seg-meta :creation-time) ctxt-time))
-             {:last-modified-time (seg-meta :creation-time)}))))
+           ;; Enqueue length of new text
+           {:segments (conj ctxt-queue (count new-text))})))
+
+(defn updated-context-time
+  [ctxt-time seg-time]
+  (when seg-time        ; Some segments are timeless
+    ;; Disallow updates that alter the chronological history
+    (if (.isBefore seg-time ctxt-time)
+      (throw (new DateTimeException
+                  (format "Appended information is older than context (%s < %s)"
+                          seg-time ctxt-time)))
+      {:last-modified-time seg-time})))
 
 (defn ccat
   [ctxt segment]
-  (let [prev-text (ctxt :text)        ; Text currently being part of the context
-        seg-text (segment :text)]     ; New text to be added
+  (let [{ctxt-text :text
+         ctxt-time :last-modified-time} ctxt
+        {seg-text :text
+         seg-time :creation-time} segment]
     ;; Generate a new context with updated metadata
     (vary-meta
-     (assoc ctxt
-            :text (str prev-text seg-text)) ; Concatenate new text to context
-     update-context-meta segment)))         ; Generate updated metadata with helper function
+     (merge ctxt
+            {:text (str ctxt-text seg-text)}           ; Concatenate new text to context
+            (updated-context-time ctxt-time seg-time)) ; Update contextual timestamp
+     update-context-meta segment)))                    ; Generate updated metadata through helper function
 
 (defn +facts
   [history facts] (str default-agent " knows that: " facts))
