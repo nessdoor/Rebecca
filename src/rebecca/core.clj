@@ -1,7 +1,7 @@
 (ns rebecca.core
   (:require [wkok.openai-clojure.api :as oai])
-  (:import java.time.Instant
-           java.time.DateTimeException))
+  (:import (java.time DateTimeException Instant)
+           java.time.temporal.ChronoUnit))
 
 (def default-speaker "Other")
 
@@ -9,6 +9,11 @@
 
 (def default-parameters {:model "text-davinci-003"
                          :temperature 0})
+
+(defn make-prompt
+  ([speaker] (make-prompt speaker (Instant/now)))
+  ([speaker instant]
+   (format "[%s|%s]:" speaker (.truncatedTo instant ChronoUnit/MINUTES))))
 
 (defn context
   [intro & {:keys [participants agent]
