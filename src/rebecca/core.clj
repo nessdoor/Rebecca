@@ -10,11 +10,6 @@
 (def default-parameters {:model "text-davinci-003"
                          :temperature 0})
 
-(defn make-prompt
-  ([speaker] (make-prompt speaker (Instant/now)))
-  ([speaker instant]
-   (format "[%s|%s]:" speaker (.truncatedTo instant ChronoUnit/MINUTES))))
-
 (defn context
   [intro & {:keys [participants agent]
             :or {participants default-speaker agent default-agent}}]
@@ -63,11 +58,21 @@
      update-context-meta segment)))                    ; Generate updated metadata through helper function
 
 (defn +facts
-  [history facts] (str default-agent " knows that: " facts))
+  [ctxt facts]
+  (let [{agent-name :model} ctxt]
+    (ccat ctxt
+          {:text (str agent-name " knows that: " facts)})))
+
+(defn make-prompt
+  ([speaker] (make-prompt speaker (Instant/now)))
+  ([speaker instant]
+   (format "[%s|%s]:" speaker (.truncatedTo instant ChronoUnit/MINUTES))))
 
 (defn +input
-  ([history input] (+input history default-speaker input))
-  ([history speaker input] (str history (format "\n[%s]:%s" speaker input))))
+  [ctxt input & {ctime :creation-time sp :speaker
+                 :or {ctime (Instant/now) sp default-speaker}}]
+  (ccat ctxt {:text (str (make-prompt sp ctime) input)
+              :creation-time ctime}))
 
 (defn epsilon-extend
   [history & {:as model-params}]
