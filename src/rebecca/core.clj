@@ -91,11 +91,3 @@
     ;; First return value is the completion, while second is the extended context
     [completion
      (ccat ctxt {:text (str aprompt completion) :creation-time nowt})]))
-
-(defn get-reply
-  [context input & {:keys [speaker] :or {speaker default-speaker} :as extra}]
-  (->
-   context
-   (+input speaker input)
-   (epsilon-extend
-    (dissoc extra :speaker))))         ; Pass extra parameters to API w/o :speaker
