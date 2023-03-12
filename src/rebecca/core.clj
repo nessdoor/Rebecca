@@ -75,12 +75,13 @@
               :creation-time ctime}))
 
 (defn epsilon-extend
-  [history & {:as model-params}]
-  (oai/create-completion
-   (merge default-parameters
-          model-params
-          {:prompt (str history
-                        (format "\n[%s]:" default-agent))})))
+  [ctxt & {:as model-params}]
+  (let [{:keys [agent-name]} ctxt
+        curr-time (Instant/now)
+        prompt (str (ctxt :text)
+                    (make-prompt agent-name curr-time))]
+    (oai/create-completion
+     (merge default-parameters model-params {:prompt prompt}))))
 
 (defn get-reply
   [context input & {:keys [speaker] :or {speaker default-speaker} :as extra}]
