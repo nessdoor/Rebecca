@@ -80,12 +80,12 @@
    (merge default-parameters model-params {:prompt text})))
 
 (defn epsilon-extend
-  [ctxt & {:as model-params}]
+  [ctxt compl-backend & {:as model-params}]
   (let [{aname :agent-name ctext :text} ctxt
         nowt (Instant/now)
         aprompt (make-prompt aname nowt)        ; Chat prompt for the agent
         tbc (str ctext aprompt)                 ; Text sent to the API
-        answer (try-complete tbc model-params)  ; Answer from the API
+        answer (compl-backend tbc model-params) ; Answer from the API
         {:keys [choices]} answer                ; Completion candidates
         {completion :text} (first choices)]     ; First completion text candidate
     ;; First return value is the completion, while second is the extended context
