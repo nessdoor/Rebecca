@@ -18,7 +18,7 @@
              "\nWhat follows is a conversation between " agent " and " participants ".")]
     (with-meta
       ;; The context itself
-      {:model agent                       ; Name of the agent
+      {:agent-name agent
        :text init-text                    ; Introductory text
        :last-modified-time (Instant/now)} ; Timestamp of last received/produced info
       ;; Metadata
@@ -59,7 +59,7 @@
 
 (defn +facts
   [ctxt facts]
-  (let [{agent-name :model} ctxt]
+  (let [{:keys [agent-name]} ctxt]
     (ccat ctxt
           {:text (str agent-name " knows that: " facts)})))
 
