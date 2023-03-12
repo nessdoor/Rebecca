@@ -53,7 +53,7 @@
     ;; Generate a new context with updated metadata
     (vary-meta
      (merge ctxt
-            {:text (str ctxt-text seg-text)}           ; Concatenate new text to context
+            {:text (str ctxt-text "\n" seg-text)}      ; Concatenate new text to context
             (updated-context-time ctxt-time seg-time)) ; Update contextual timestamp
      update-context-meta segment)))                    ; Generate updated metadata through helper function
 
