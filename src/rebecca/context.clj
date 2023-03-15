@@ -1,4 +1,5 @@
 (ns rebecca.context
+  (:require [clojure.string :as cstr])
   (:import (java.time DateTimeException Instant)
            java.time.temporal.ChronoUnit))
 
@@ -6,9 +7,21 @@
 
 (def default-agent "Rebecca")
 
+(def default-token-limit 2048)
+
+(def default-trim-factor 3/4)
+
+(def default-token-estimator (fn [seg-text]
+                               (* 4/3
+                                  (count (cstr/split seg-text #"\s+")))))
+
 (defn context
-  [intro & {:keys [participants agent]
-            :or {participants default-speaker agent default-agent}}]
+  [intro & {:keys [participants agent tlim trim-fact testim]
+            :or {participants default-speaker
+                 agent default-agent
+                 tlim default-token-limit
+                 trim-fact default-trim-factor
+                 testim default-token-estimator}}]
   (let [init-text
         (str intro
              "\nWhat follows is a conversation between " agent " and " participants ".")]
@@ -19,16 +32,26 @@
        :last-modified-time (Instant/now)} ; Timestamp of last received/produced info
       ;; Metadata
       {:primer (count init-text)          ; Length of the introductory text
-       :segments                          ; Queue containing the length of each discrete message
+       :tokens (testim init-text)         ; Length in tokens of the whole context
+       :tokens-limit tlim                 ; Hard limit on the number of tokens
+       :trim-factor trim-fact             ; Proportion of context to keep after trimming
+       :tokens-estimator testim           ; Number-of-tokens estimator
+       :segments                          ; Queue containing the length (chars and tokens) of each discrete message
        clojure.lang.PersistentQueue/EMPTY})))
 
 (defn update-context-meta
   [ctxt-meta segment]
-  (let [ctxt-queue (ctxt-meta :segments)
-        new-text (segment :text)]       ; New text contained in the segment
+  (let [{segq :segments
+         ctok :tokens
+         testim :tokens-estimator} ctxt-meta
+        seg-text (segment :text)      ; New text contained in the segment
+        {seg-tokens :tokens           ; (Estimated) number of tokens in new text
+         :or {seg-tokens (testim seg-text)}} (meta segment)]
     (merge ctxt-meta
-           ;; Enqueue length of new text
-           {:segments (conj ctxt-queue (count new-text))})))
+           ;; Enqueue length of new text (chars and tokens)
+           {:segments (conj segq [(count seg-text) seg-tokens])
+            ;; Increase overall token count
+            :tokens (+ ctok seg-tokens)})))
 
 (defn updated-context-time
   [ctxt-time seg-time]
@@ -40,18 +63,49 @@
                           seg-time ctxt-time)))
       {:last-modified-time seg-time})))
 
+(defn pop-segments
+  [queue char-acc toks-count toks-limit]
+  (if (<= toks-count toks-limit)
+    [char-acc toks-count queue]         ; If lower limit reached, return
+    (let [[ch toks] (peek queue)]       ; Otherwise, pop segment and recur
+      (recur (pop queue) (+ char-acc ch) (+ toks-count toks) toks-limit))))
+
+(defn trim-history
+  [ctxt]
+  (let [cmeta (meta ctxt)
+        [cut-chars trimmed-len segq]
+        (let [{:keys [segments tokens tokens-limit trim-factor]} cmeta]
+          (pop-segments segments 0 tokens (* tokens-limit trim-factor)))]
+    (vary-meta
+     (assoc ctxt
+            ;; Truncate history by cut-chars, leaving the primer intact
+            {:text (let [primlen (:primer cmeta) ctext (:text ctxt)]
+                     (str (subs ctext 0 primlen)
+                          (subs ctext (+ primlen cut-chars))))})
+     merge
+     {:tokens trimmed-len :segments segq})))
+
+(defn ccat-unsafe
+  [ctxt segment]
+  ;; Generate a new context with updated metadata
+  (vary-meta
+   (merge ctxt
+          ;; Concatenate new text to context
+          {:text (str (ctxt :text) "\n" (segment :text))}
+          ;; Update context timestamp
+          (updated-context-time (ctxt :last-modified-time)
+                                (segment :creation-time)))
+   ;; Generate updated metadata through helper function
+   update-context-meta segment))
+
 (defn ccat
   [ctxt segment]
-  (let [{ctxt-text :text
-         ctxt-time :last-modified-time} ctxt
-        {seg-text :text
-         seg-time :creation-time} segment]
-    ;; Generate a new context with updated metadata
-    (vary-meta
-     (merge ctxt
-            {:text (str ctxt-text "\n" seg-text)}      ; Concatenate new text to context
-            (updated-context-time ctxt-time seg-time)) ; Update contextual timestamp
-     update-context-meta segment)))                    ; Generate updated metadata through helper function
+  (let [new-ctxt (ccat-unsafe ctxt segment) ; Unchecked segment concatenation
+        {ctok :tokens ctlim :tokens-limit} (meta new-ctxt)]
+    ;; If the total number of tokens surpassed the limit, trim history
+    (if (> ctok ctlim)
+      (trim-history new-ctxt)
+      new-ctxt)))
 
 (defn +facts
   [ctxt facts]
