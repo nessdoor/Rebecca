@@ -64,8 +64,12 @@
         aprompt (make-prompt aname nowt)        ; Chat prompt for the agent
         tbc (str ctext aprompt)                 ; Text sent to the API
         answer (compl-backend tbc model-params) ; Answer from the API
-        {:keys [choices]} answer                ; Completion candidates
+        {:keys [choices usage]} answer          ; Completion candidates and usage
         {completion :text} (first choices)]     ; First completion text candidate
     ;; First return value is the completion, while second is the extended context
     [completion
-     (ccat ctxt {:text (str aprompt completion) :creation-time nowt})]))
+     (ccat ctxt {:text (str aprompt completion)
+                 :creation-time nowt
+                 ;; Use reported usage to cancel estimation error in number of tokens
+                 :tokens (- (:total_tokens usage)
+                            (:tokens (meta ctxt)))})]))
