@@ -1,7 +1,8 @@
 (ns rebecca.core
   (:require [wkok.openai-clojure.api :as oai]
-            [rebecca.context :refer [default-agent default-speaker
-                                     context +facts +input epsilon-extend]]))
+            (rebecca.context [ops :refer [default-agent default-speaker
+                                          context +facts +input epsilon-extend]]
+                             [concat :refer [ccat]])))
 
 (def default-parameters {:model "text-davinci-003"
                          :temperature 0})

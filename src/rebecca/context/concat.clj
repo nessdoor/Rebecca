@@ -1,4 +1,4 @@
-(ns rebecca.conc-hist
+(ns rebecca.context.concat
   (:import java.time.DateTimeException
            java.time.temporal.ChronoUnit))
 
@@ -60,3 +60,12 @@
                                 (segment :creation-time)))
    ;; Generate updated metadata through helper function
    update-context-meta segment))
+
+(defn ccat
+  [ctxt segment]
+  (let [new-ctxt (ccat-unsafe ctxt segment) ; Unchecked segment concatenation
+        {ctok :tokens ctlim :tokens-limit} (meta new-ctxt)]
+    ;; If the total number of tokens surpassed the limit, trim history
+    (if (> ctok ctlim)
+      (trim-history new-ctxt)
+      new-ctxt)))

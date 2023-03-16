@@ -1,6 +1,6 @@
-(ns rebecca.context
+(ns rebecca.context.ops
   (:require [clojure.string :as cstr]
-            [rebecca.conc-hist :refer [ccat-unsafe trim-history]])
+            [rebecca.context.concat :refer [ccat trim-history]])
   (:import java.time.Instant
            java.time.temporal.ChronoUnit))
 
@@ -44,15 +44,6 @@
        :tokens-estimator testim           ; Number-of-tokens estimator
        :segments                          ; Queue containing the length (chars and tokens) of each discrete message
        clojure.lang.PersistentQueue/EMPTY})))
-
-(defn ccat
-  [ctxt segment]
-  (let [new-ctxt (ccat-unsafe ctxt segment) ; Unchecked segment concatenation
-        {ctok :tokens ctlim :tokens-limit} (meta new-ctxt)]
-    ;; If the total number of tokens surpassed the limit, trim history
-    (if (> ctok ctlim)
-      (trim-history new-ctxt)
-      new-ctxt)))
 
 (defn +facts
   [ctxt facts]
