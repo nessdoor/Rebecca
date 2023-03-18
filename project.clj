@@ -4,5 +4,7 @@
   :license {:name "Mozilla Public License Version 2.0"
             :url "http://mozilla.org/MPL/2.0/"}
   :dependencies [[org.clojure/clojure "1.11.1"]
-                 [net.clojars.wkok/openai-clojure "0.3.1"]]
+                 [net.clojars.wkok/openai-clojure "0.3.1"]
+                 [telegrambot-lib "2.5.0"]
+                 [cheshire "5.11.0"]]
   :repl-options {:init-ns rebecca.core})
