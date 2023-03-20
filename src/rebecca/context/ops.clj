@@ -35,7 +35,7 @@
       ;; The context itself
       {:agent-name agent
        :text init-text                    ; Introductory text
-       :last-modified-time (Instant/now)} ; Timestamp of last received/produced info
+       :timestamp (Instant/now)}          ; Last modification time
       ;; Metadata
       {:primer (count init-text)          ; Length of the introductory text
        :tokens (testim init-text)         ; Length in tokens of the whole context
@@ -52,10 +52,10 @@
           {:text (str agent-name " knows that: " facts)})))
 
 (defn +input
-  [ctxt input & {ctime :creation-time sp :speaker
+  [ctxt input & {ctime :timestamp sp :speaker
                  :or {ctime (Instant/now) sp default-speaker}}]
   (ccat ctxt {:text (str (make-prompt sp ctime) input)
-              :creation-time ctime}))
+              :timestamp ctime}))
 
 (defn epsilon-extend
   [ctxt compl-backend & {:as model-params}]
@@ -69,7 +69,7 @@
     ;; First return value is the completion, while second is the extended context
     [completion
      (ccat ctxt {:text (str aprompt completion)
-                 :creation-time nowt
+                 :timestamp nowt
                  ;; Use reported usage to cancel estimation error in number of tokens
                  :tokens (- (:total_tokens usage)
                             (:tokens (meta ctxt)))})]))

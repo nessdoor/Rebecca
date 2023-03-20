@@ -34,14 +34,14 @@
                    {speaker :first_name} :form
                    msg-text :text} m]
               (-> c
-                  (+input msg-text :creation-time (Instant/ofEpochSecond ctime)
+                  (+input msg-text :timestamp (Instant/ofEpochSecond ctime)
                           :speaker speaker)
                   (epsilon-extend try-complete :temperature 0.8 :max_tokens 256)
                   (send-reply chat-id message-id))))
           ctxt
           (filter (fn [m] (not (or (nil? (:text m))
                                    (< (:date m)
-                                      (.getEpochSecond (:last-modified-time ctxt))))))
+                                      (.getEpochSecond (:timestamp ctxt))))))
                   (map :message messages))))
 
 (defn polling-loop

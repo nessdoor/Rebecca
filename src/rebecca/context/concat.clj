@@ -24,7 +24,7 @@
       (throw (new DateTimeException
                   (format "Appended information is older than context (%s < %s)"
                           seg-time ctxt-time)))
-      {:last-modified-time seg-time})))
+      {:timestamp seg-time})))
 
 (defn pop-segments
   [queue char-acc toks-count toks-limit]
@@ -56,8 +56,8 @@
           ;; Concatenate new text to context
           {:text (str (ctxt :text) "\n" (segment :text))}
           ;; Update context timestamp
-          (updated-context-time (ctxt :last-modified-time)
-                                (segment :creation-time)))
+          (updated-context-time (ctxt :timestamp)
+                                (segment :timestamp)))
    ;; Generate updated metadata through helper function
    update-context-meta segment))
 
