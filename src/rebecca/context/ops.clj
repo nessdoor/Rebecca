@@ -19,7 +19,7 @@
 (defn make-prompt
   ([speaker] (make-prompt speaker (Instant/now)))
   ([speaker instant]
-   (format "[%s|%s]:" speaker (.truncatedTo instant ChronoUnit/MINUTES))))
+   (format "[%s|%s]:" speaker (.truncatedTo instant ChronoUnit/SECONDS))))
 
 (defn context
   [intro & {:keys [participants agent tlim trim-fact testim]
