@@ -68,7 +68,30 @@
   (set-payload query-updates)
   (.interrupt (Thread/currentThread)))
 
+(def saved-context (atom (context "Rebecca is a GPT-based general-purpose multi-lingual
+chatbot currently undergoing alpha-testing with a small group of users. In her
+current state, she doesn't have a long-lasting memory, and reboots will make her
+forget all previous conversations. Once the initial testing phase is complete,
+she will be given a persistent memory and more powerful logical abilities.
+In addition, she can only see messages sent directly to her."
+                                  :agent "Rebecca"
+                                  :participants "a group of alpha-testers"
+                                  :tlim 3096)))
 
+(defn set-context
+  [c]
+  (swap! saved-context (fn [a] c)))
+
+(defn store-context
+  [last-read ctxt]
+  (set-context ctxt)
+  (set-payload query-updates)
+  [last-read ctxt])
+
+(defn load-context
+  [last-read ctxt]
+  (set-payload query-updates)
+  [last-read @saved-context])
 
 (defn polling-loop
   [last-read ctxt]
@@ -77,15 +100,4 @@
     (let [[new-read new-ctxt] (@payload last-read ctxt)]
       (recur new-read new-ctxt))))
 
-(defn main
-  []
-  (let [context (context "Rebecca is a GPT-based general-purpose multi-lingual
-chatbot currently undergoing alpha-testing with a small group of users. In her
-current state, she doesn't have a long-lasting memory, and reboots will make her
-forget all previous conversations. Once the initial testing phase is complete,
-she will be given a persistent memory and more powerful logical abilities.
-In addition, she can only see messages sent directly to her."
-                         :agent "Rebecca"
-                         :participants "a group of alpha-testers"
-                         :tlim 3096)]
-    (a/thread (polling-loop -1 context))))
+(defn main [] (a/thread (polling-loop -1 @saved-context)))
