@@ -1,5 +1,6 @@
 (ns rebecca.core
-  (:require [wkok.openai-clojure.api :as oai]
+  (:require [clojure.core.async :as a]
+            [wkok.openai-clojure.api :as oai]
             (rebecca.context [ops :refer [default-agent default-speaker
                                           context +facts +input epsilon-extend]]
                              [concat :refer [ccat]])
@@ -44,20 +45,37 @@
                                       (.getEpochSecond (:timestamp ctxt))))))
                   (map :message messages))))
 
+(def payload (atom query-updates))
+
+(defn set-payload
+  [f]
+  (swap! payload (fn [a] f)))
+
+(defn query-updates
+  [last-read ctxt]
+  (let [{status :ok results :result error :error}
+        (tbot/get-updates bot {:offset last-read
+                               :allowed_updates ["message"]})]
+    (if (or status error)
+      (if (= 0 (count results))
+        [last-read ctxt]
+        [(+ 1 (:update_id (last results))) (reply-extend ctxt results)])
+      (do (prn "Error")
+          [last-read ctxt]))))
+
+(defn terminate
+  [& args]
+  (set-payload query-updates)
+  (.interrupt (Thread/currentThread)))
+
+
+
 (defn polling-loop
   [last-read ctxt]
   (do
     (Thread/sleep 5000)
-    (let [{status :ok results :result error :error}
-          (tbot/get-updates bot {:offset last-read
-                                 :allowed_updates ["message"]})]
-      (if (or status error)
-        (if (= 0 (count results))
-          (recur last-read ctxt)
-          (recur (+ 1 (:update_id (last results)))
-                 (reply-extend ctxt results)))
-        (do (prn "Error")
-            (recur last-read ctxt))))))
+    (let [[new-read new-ctxt] (@payload last-read ctxt)]
+      (recur new-read new-ctxt))))
 
 (defn main
   []
@@ -70,4 +88,4 @@ In addition, she can only see messages sent directly to her."
                          :agent "Rebecca"
                          :participants "a group of alpha-testers"
                          :tlim 3096)]
-    (polling-loop -1 context)))
+    (a/thread (polling-loop -1 context))))
