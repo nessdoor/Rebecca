@@ -22,54 +22,67 @@
    (format "[%s|%s]:" speaker (.truncatedTo instant ChronoUnit/SECONDS))))
 
 (defn context
-  [intro & {:keys [participants agent tlim trim-fact testim]
+  [text & {:keys [participants agent tlim trim-fact testim]
             :or {participants default-speaker
                  agent default-agent
                  tlim default-token-limit
                  trim-fact default-trim-factor
                  testim default-token-estimator}}]
-  (let [init-text
-        (str intro
-             "\nWhat follows is a conversation between " agent " and " participants ".")]
+  (let [preamble
+        (str text
+             "\nWhat follows is a conversation between " agent " and " participants ".")
+        pre-toks (testim preamble)]
     (with-meta
       ;; The context itself
-      {:agent-name agent
-       :text init-text                    ; Introductory text
-       :timestamp (Instant/now)}          ; Last modification time
+      {:agent agent               ; Agent name
+       :preamble preamble}        ; Introductory text
       ;; Metadata
-      {:primer (count init-text)          ; Length of the introductory text
-       :tokens (testim init-text)         ; Length in tokens of the whole context
-       :tokens-limit tlim                 ; Hard limit on the number of tokens
-       :trim-factor trim-fact             ; Proportion of context to keep after trimming
-       :tokens-estimator testim           ; Number-of-tokens estimator
-       :segments                          ; Queue containing the length (chars and tokens) of each discrete message
-       clojure.lang.PersistentQueue/EMPTY})))
+      {:tokens pre-toks           ; Length in tokens of the whole context
+       :tokens-limit tlim         ; Hard limit on the number of tokens
+       :trim-factor trim-fact     ; Proportion of context to keep after trimming
+       :tokens-estimator testim   ; Number-of-tokens estimator
+       :pre-toks pre-toks})))     ; Length of the introductory text
+
+(defn to-history
+  [component]
+  (let [{:keys [timestamp]} component
+        {:keys [tokens]} (meta component)]
+    (with-meta
+      {:components (conj clojure.lang.PersistentQueue/EMPTY component)
+       :start-time timestamp :end-time timestamp}
+      {:tokens tokens})))
 
 (defn +facts
-  [ctxt facts]
-  (let [{:keys [agent-name]} ctxt]
-    (ccat ctxt
-          {:text (str agent-name " knows that: " facts)})))
+  [hist facts]
+  (let [{agent :agent testim :tokens-estimator
+         :or {agent default-agent testim default-token-estimator}} hist]
+    (ccat hist
+          (to-history
+           (let [text (str agent " knows that: " facts)]
+             (with-meta
+               {:text text
+                :timestamp (Instant/now)}
+               {:tokens (testim text)}))))))
 
 (defn +input
-  [ctxt input & {ctime :timestamp sp :speaker
+  [hist input & {ctime :timestamp sp :speaker
                  :or {ctime (Instant/now) sp default-speaker}}]
-  (ccat ctxt {:text (str (make-prompt sp ctime) input)
-              :timestamp ctime}))
+  (let [isp (.intern sp)                ; Speaker string is highly-repetitive
+        prompt (make-prompt isp ctime)
+        expa (str prompt input)
+        {testim :tokens-estimator
+         :or {testim default-token-estimator}} (meta hist)]
+    (ccat hist
+          (to-history
+           (with-meta {:speaker isp
+                       ;; Reuse expansion for representing the input text
+                       :text (subs expa (count prompt))
+                       :timestamp ctime}
+             {:expansion expa            ; Caching expansion speeds up concat
+              :tokens (testim expa)})))))
 
 (defn epsilon-extend
   [ctxt compl-backend & {:as model-params}]
-  (let [{aname :agent-name ctext :text} ctxt
-        nowt (Instant/now)
-        aprompt (make-prompt aname nowt)        ; Chat prompt for the agent
-        tbc (str ctext aprompt)                 ; Text sent to the API
-        answer (compl-backend tbc model-params) ; Answer from the API
-        {:keys [choices usage]} answer          ; Completion candidates and usage
-        {completion :text} (first choices)]     ; First completion text candidate
+  (let [answer (compl-backend ctxt model-params)] ; Answer from the API
     ;; First return value is the completion, while second is the extended context
-    [completion
-     (ccat ctxt {:text (str aprompt completion)
-                 :timestamp nowt
-                 ;; Use reported usage to cancel estimation error in number of tokens
-                 :tokens (- (:total_tokens usage)
-                            (:tokens (meta ctxt)))})]))
+    [answer (ccat ctxt (to-history answer))]))

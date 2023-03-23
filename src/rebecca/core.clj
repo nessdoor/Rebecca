@@ -1,7 +1,8 @@
 (ns rebecca.core
   (:require [clojure.core.async :as a]
+            [clojure.string :as cstr]
             [wkok.openai-clojure.api :as oai]
-            (rebecca.context [ops :refer [default-agent default-speaker
+            (rebecca.context [ops :refer [default-agent default-speaker make-prompt
                                           context +facts +input epsilon-extend]]
                              [concat :refer [ccat]])
             [telegrambot-lib.core :as tbot])
@@ -11,9 +12,27 @@
                          :temperature 0})
 
 (defn try-complete
-  [text & {:as model-params}]
-  (oai/create-completion
-   (merge default-parameters model-params {:prompt text})))
+  [ctxt & {:as model-params}]
+  (let [{agent :agent pre :preamble comp :components} ctxt
+        ctime (Instant/now)
+        footer (make-prompt agent ctime) ; Chat prompt that stimulates response
+        result (oai/create-completion
+                (merge
+                 default-parameters model-params
+                 ;; Prompt is the concatenation of primer, history and footer
+                 {:prompt (cstr/join
+                           (concat (list pre)
+                                   ;; Use the cached expansions to build prompt
+                                   (map (fn [c] (:expansion (meta c))) comp)
+                                   (list footer)))}))
+        ;; Concatenate footer with the first completion to obtain final text
+        completion (str footer (:text (first (:choices result))))]
+    (with-meta
+      {:speaker agent :text (subs completion (count footer)) :timestamp ctime}
+      ;; Adjust toen usage estimation error with the response from the API
+      {:tokens (- (:total_tokens (:usage result))
+                  (:tokens (meta ctxt)))
+       :expansion completion})))
 
 (def bot (tbot/create))
 
@@ -22,8 +41,8 @@
   (do
     (tbot/send-message bot {:chat_id chat-id
                             :reply_to_message_id message-id
-                            :text reply})
-    (prn reply "\n" (:tokens (meta ctxt)))
+                            :text (:text reply)})
+    (prn reply (:tokens (meta ctxt)))
     ctxt))
 
 (defn reply-extend
@@ -32,17 +51,17 @@
             (let [{ctime :date
                    message-id :message_id
                    {chat-id :id} :chat
-                   {speaker :first_name} :form
-                   msg-text :text} m]
+                   {speaker :first_name :or {speaker "System"}} :from
+                   msg-text :text :or {msg-text ""}} m]
               (-> c
                   (+input msg-text :timestamp (Instant/ofEpochSecond ctime)
                           :speaker speaker)
-                  (epsilon-extend try-complete :temperature 0.8 :max_tokens 256)
+                  (epsilon-extend try-complete :temperature 0.8 :max_tokens 1024)
                   (send-reply chat-id message-id))))
           ctxt
           (filter (fn [m] (not (or (nil? (:text m))
                                    (< (:date m)
-                                      (.getEpochSecond (:timestamp ctxt))))))
+                                      (.getEpochSecond (:end-time ctxt (Instant/MIN)))))))
                   (map :message messages))))
 
 (def payload (atom query-updates))

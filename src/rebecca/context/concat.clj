@@ -2,70 +2,51 @@
   (:import java.time.DateTimeException
            java.time.temporal.ChronoUnit))
 
-(defn update-context-meta
-  [ctxt-meta segment]
-  (let [{segq :segments
-         ctok :tokens
-         testim :tokens-estimator} ctxt-meta
-        seg-text (segment :text)      ; New text contained in the segment
-        {seg-tokens :tokens           ; (Estimated) number of tokens in new text
-         :or {seg-tokens (testim seg-text)}} (meta segment)]
-    (merge ctxt-meta
-           ;; Enqueue length of new text (chars and tokens)
-           {:segments (conj segq [(count seg-text) seg-tokens])
-            ;; Increase overall token count
-            :tokens (+ ctok seg-tokens)})))
-
-(defn updated-context-time
-  [ctxt-time seg-time]
-  (when seg-time        ; Some segments are timeless
-    ;; Disallow updates that alter the chronological history
-    (if (.isBefore seg-time ctxt-time)
-      (throw (new DateTimeException
-                  (format "Appended information is older than context (%s < %s)"
-                          seg-time ctxt-time)))
-      {:timestamp seg-time})))
-
-(defn pop-segments
-  [queue char-acc toks-count toks-limit]
-  (if (<= toks-count toks-limit)
-    [char-acc toks-count queue]         ; If lower limit reached, return
-    (let [[ch toks] (peek queue)]       ; Otherwise, pop segment and recur
-      (recur (pop queue) (+ char-acc ch) (+ toks-count toks) toks-limit))))
-
 (defn trim-history
-  [ctxt]
-  (let [cmeta (meta ctxt)
-        [cut-chars trimmed-len segq]
-        (let [{:keys [segments tokens tokens-limit trim-factor]} cmeta]
-          (pop-segments segments 0 tokens (* tokens-limit trim-factor)))]
-    (vary-meta
-     (assoc ctxt
-            ;; Truncate history by cut-chars, leaving the primer intact
-            {:text (let [primlen (:primer cmeta) ctext (:text ctxt)]
-                     (str (subs ctext 0 primlen)
-                          (subs ctext (+ primlen cut-chars))))})
-     merge
-     {:tokens trimmed-len :segments segq})))
+  [h]
+  (let [{:keys [tokens tokens-limit trim-factor] :or {trim-factor 1}} (meta h)
+        {:keys [components]} h]
+    ;; Pop from history until we have recouped enough tokens
+    (loop [cmps components
+           tgoal (- tokens (* tokens-limit trim-factor))
+           recouped 0]
+      (if (< recouped tgoal)
+        (let [ctok (:tokens (meta (peek cmps)))]
+          (recur (pop cmps) tgoal (+ recouped ctok)))
+        ;; Once the goal is reached, recreate history from the shortened queue
+        (vary-meta
+         (merge h {:components cmps
+                   ;; Start time equal to the timestamp of the 1st component
+                   :start-time (:timestamp (peek cmps))})
+         merge {:tokens (- tokens recouped)})))))
 
-(defn ccat-unsafe
-  [ctxt segment]
-  ;; Generate a new context with updated metadata
+(defn ccat-uncapped
+  [l r]
   (vary-meta
-   (merge ctxt
-          ;; Concatenate new text to context
-          {:text (str (ctxt :text) "\n" (segment :text))}
-          ;; Update context timestamp
-          (updated-context-time (ctxt :timestamp)
-                                (segment :timestamp)))
-   ;; Generate updated metadata through helper function
-   update-context-meta segment))
+   ;; Create a new history concatenating the left and right segments
+   (merge l
+          ;; Concatenate queues
+          {:components
+           (into (:components l clojure.lang.PersistentQueue/EMPTY)
+                 (:components r))}
+          ;; Merge time ranges, respecting timeless segments
+          (if (or (contains? l :start-time)
+                  (contains? r :start-time))
+            {:start-time (:start-time l (:start-time r))})
+          (if (or (contains? r :end-time)
+                  (contains? l :end-time))
+            {:end-time (:end-time r (:end-time l))}))
+   ;; Metadata is merged, and token count is summed
+   merge (meta r) {:tokens (+ (:tokens (meta l))
+                              (:tokens (meta r)))}))
 
 (defn ccat
-  [ctxt segment]
-  (let [new-ctxt (ccat-unsafe ctxt segment) ; Unchecked segment concatenation
-        {ctok :tokens ctlim :tokens-limit} (meta new-ctxt)]
-    ;; If the total number of tokens surpassed the limit, trim history
-    (if (> ctok ctlim)
-      (trim-history new-ctxt)
-      new-ctxt)))
+  [l r]
+  (let [result (ccat-uncapped l r) ; Unchecked history concatenation
+        {ctok :tokens ctlim :tokens-limit} (meta result)]
+    ;; If there is a limit on the total number of tokens and this has been
+    ;; surpassed, trim history
+    (if (and ctlim
+             (> ctok ctlim))
+      (trim-history result)
+      result)))
