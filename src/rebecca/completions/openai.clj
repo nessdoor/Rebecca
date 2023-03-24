@@ -2,10 +2,10 @@
   (:require [clojure.string :as cstr]
             [wkok.openai-clojure.api :as oai]
             [rebecca.context.ops :refer [make-prompt]])
-  (:import java.time.Instant))
+  (:import java.time.Instant
+           java.time.temporal.ChronoUnit))
 
-(def default-parameters {:model "text-davinci-003"
-                         :temperature 0})
+(def default-parameters {:temperature 0})
 
 (defn davinci-3-complete
   [ctxt & {:as model-params}]
@@ -14,7 +14,9 @@
         footer (make-prompt agent ctime) ; Chat prompt that stimulates response
         result (oai/create-completion
                 (merge
-                 default-parameters model-params
+                 default-parameters
+                 model-params
+                 {:model "text-davinci-003"}
                  ;; Prompt is the concatenation of primer, history and footer
                  {:prompt (cstr/join
                            (concat (list pre)
@@ -25,7 +27,48 @@
         completion (str footer (:text (first (:choices result))))]
     (with-meta
       {:speaker agent :text (subs completion (count footer)) :timestamp ctime}
-      ;; Adjust toen usage estimation error with the response from the API
+      ;; Adjust token usage estimation error with the response from the API
       {:tokens (- (:total_tokens (:usage result))
                   (:tokens (meta ctxt)))
        :expansion completion})))
+
+(defn system-time-msg [time]
+  {:role "system"
+   :content (format "Time:%s"
+                    (.truncatedTo time ChronoUnit/SECONDS))})
+
+(defn to-chat-format
+  [agent-name msg]
+  (let [{:keys [speaker text timestamp]} msg
+        {exp :expansion
+         :or {exp (str (make-prompt speaker timestamp))}} (meta msg)]
+    (cond
+      ;; Every message from the agent is preceded by a system timestamp
+      (= agent-name speaker) [(system-time-msg timestamp)
+                              {:role "assistant" :content text}]
+      (nil? speaker) [{:role "system" :content text}]
+      :else [{:role "user" :content exp}])))
+
+(defn gpt-35-chat
+  [ctxt & {:as model-params}]
+  (let [{agent :agent pre :preamble comp :components} ctxt
+        ctime (Instant/now)
+        result (oai/create-chat-completion
+                (merge
+                 default-parameters
+                 model-params
+                 {:model "gpt-3.5-turbo"}
+                 ;; Prompt is the concatenation of primer, history and footer
+                 {:messages
+                  (vec (concat
+                        (list {:role "system" :content pre})
+                        ;; Format components into chat messages
+                        (mapcat (fn [m] (to-chat-format agent m)) comp)
+                        (list (system-time-msg ctime))))}))
+        ;; Concatenate footer with the first completion to obtain final text
+        completion (:content (:message (first (:choices result))))]
+    (with-meta
+      {:speaker agent :text completion :timestamp ctime}
+      ;; Adjust token usage estimation error with the response from the API
+      {:tokens (- (:total_tokens (:usage result))
+                  (:tokens (meta ctxt)))})))

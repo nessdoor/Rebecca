@@ -30,7 +30,7 @@
               (-> c
                   (+input msg-text :timestamp (Instant/ofEpochSecond ctime)
                           :speaker speaker)
-                  (epsilon-extend roai/davinci-3-complete
+                  (epsilon-extend roai/gpt-35-chat
                                   :temperature 0.8 :max_tokens 1024)
                   (send-reply chat-id message-id))))
           ctxt
@@ -38,12 +38,6 @@
                                    (< (:date m)
                                       (.getEpochSecond (:end-time ctxt (Instant/MIN)))))))
                   (map :message messages))))
-
-(def payload (atom query-updates))
-
-(defn set-payload
-  [f]
-  (swap! payload (fn [a] f)))
 
 (defn query-updates
   [last-read ctxt]
@@ -56,6 +50,12 @@
         [(+ 1 (:update_id (last results))) (reply-extend ctxt results)])
       (do (prn "Error")
           [last-read ctxt]))))
+
+(def payload (atom query-updates))
+
+(defn set-payload
+  [f]
+  (swap! payload (fn [a] f)))
 
 (defn terminate
   [& args]
