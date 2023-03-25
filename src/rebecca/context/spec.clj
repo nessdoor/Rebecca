@@ -40,7 +40,14 @@
 (s/def :rebecca.history/meta (s/keys :req-un [:rebecca/tokens]))
 (s/def :rebecca/history (s/keys :req-un [:rebecca.history/components
                                          :rebecca.history/start-time
-                                         :rebecca.history/end-time]))
+                                         :rebecca.history/end-time]
+                                :gen #(gen/fmap
+                                       (fn [cs] {:components cs
+                                                 :start-time
+                                                 (:timestamp (peek cs))
+                                                 :end-time
+                                                 (:timestamp (last cs))})
+                                       (s/gen :rebecca.history/components))))
 
 ;;; Context: a (potentially empty) history accompanied by auxiliary information
 (s/def :rebecca.context/agent string?)
