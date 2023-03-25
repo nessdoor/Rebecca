@@ -1,20 +1,14 @@
 (ns rebecca.context.ops
-  (:require [clojure.string :as cstr]
-            [rebecca.context.concat :refer [ccat trim-history]])
+  (:require [rebecca.context.concat :refer [ccat to-history
+                                            default-token-estimator
+                                            default-token-limit
+                                            default-trim-factor]])
   (:import java.time.Instant
            java.time.temporal.ChronoUnit))
 
 (def default-speaker "Other")
 
 (def default-agent "Rebecca")
-
-(def default-token-limit 2048)
-
-(def default-trim-factor 3/4)
-
-(def default-token-estimator (fn [seg-text]
-                               (* 4/3
-                                  (count (cstr/split seg-text #"\s+")))))
 
 (defn make-prompt
   ([speaker] (make-prompt speaker (Instant/now)))
@@ -42,15 +36,6 @@
        :trim-factor trim-fact     ; Proportion of context to keep after trimming
        :tokens-estimator testim   ; Number-of-tokens estimator
        :pre-toks pre-toks})))     ; Length of the introductory text
-
-(defn to-history
-  [component]
-  (let [{:keys [timestamp]} component
-        {:keys [tokens]} (meta component)]
-    (with-meta
-      {:components (conj clojure.lang.PersistentQueue/EMPTY component)
-       :start-time timestamp :end-time timestamp}
-      {:tokens tokens})))
 
 (defn +facts
   [hist facts]

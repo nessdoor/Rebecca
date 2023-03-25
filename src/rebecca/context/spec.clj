@@ -37,7 +37,14 @@
                                      squeue-gen))
 (s/def :rebecca.history/start-time inst?)
 (s/def :rebecca.history/end-time inst?)
-(s/def :rebecca.history/meta (s/keys :req-un [:rebecca/tokens]))
+(s/def :rebecca.history/tokens-limit number?)
+(s/def :rebecca.history/trim-factor number?)
+(s/def :rebecca.history/tokens-estimator (s/fspec :args (s/cat :t string?)
+                                                  :ret number?))
+(s/def :rebecca.history/meta (s/keys :req-un [:rebecca/tokens]
+                                     :opt-un [:rebecca.history/tokens-limit
+                                              :rebecca.history/trim-factor
+                                              :rebecca.history/tokens-estimator]))
 (s/def :rebecca/history (s/keys :req-un [:rebecca.history/components
                                          :rebecca.history/start-time
                                          :rebecca.history/end-time]
@@ -52,16 +59,9 @@
 ;;; Context: a (potentially empty) history accompanied by auxiliary information
 (s/def :rebecca.context/agent string?)
 (s/def :rebecca.context/preamble string?)
-(s/def :rebecca.context/tokens-limit number?)
-(s/def :rebecca.context/trim-factor number?)
-(s/def :rebecca.context/tokens-estimator (s/fspec :args (s/cat :t string?)
-                                                  :ret number?))
 (s/def :rebecca.context/pre-toks number?)
 (s/def :rebecca.context/meta (s/keys :req-un [:rebecca/tokens
-                                              :rebecca.context/pre-toks]
-                                     :opt-un [:rebecca.context/tokens-limit
-                                              :rebecca.context/trim-factor
-                                              :rebecca.context/tokens-estimator]))
+                                              :rebecca.context/pre-toks]))
 (s/def :rebecca/context (s/keys :req-un [:rebecca.context/agent
                                          :rebecca.context/preamble]
                                 :opt-un [:rebecca.history/components

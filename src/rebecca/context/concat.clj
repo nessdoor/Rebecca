@@ -1,6 +1,24 @@
 (ns rebecca.context.concat
+  (:require [clojure.string :as cstr])
   (:import java.time.DateTimeException
            java.time.temporal.ChronoUnit))
+
+(def default-token-limit 2048)
+
+(def default-trim-factor 3/4)
+
+(def default-token-estimator (fn [seg-text]
+                               (* 4/3
+                                  (count (cstr/split seg-text #"\s+")))))
+
+(defn to-history
+  [component]
+  (let [{:keys [timestamp]} component
+        {:keys [tokens]} (meta component)]
+    (with-meta
+      {:components (conj clojure.lang.PersistentQueue/EMPTY component)
+       :start-time timestamp :end-time timestamp}
+      {:tokens tokens})))
 
 (defn trim-history
   [h]
