@@ -8,4 +8,5 @@
                  [net.clojars.wkok/openai-clojure "0.5.0"]
                  [telegrambot-lib "2.5.0"]
                  [cheshire "5.11.0"]]
+  :profiles {:dev {:dependencies [[org.clojure/test.check "1.1.1"]]}}
   :repl-options {:init-ns rebecca.core})

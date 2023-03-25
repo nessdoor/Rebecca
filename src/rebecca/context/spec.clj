@@ -1,5 +1,6 @@
 (ns rebecca.context.spec
-  (:require [clojure.spec.alpha :as s]))
+  (:require [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as gen]))
 
 ;;; Token count: number of tokens of which a certain text is composed of
 (s/def :rebecca/tokens number?)
@@ -20,10 +21,20 @@
 ;;; Verify whether the given object is a Clojure persistent queue
 (def persistent-queue? #(instance? clojure.lang.PersistentQueue %))
 
+;;; Persistent queue generator for property-based testing
+(defn pqueue [generator] (gen/fmap #(into clojure.lang.PersistentQueue/EMPTY %)
+                                   generator))
+
+;;; Generate persistent queues of chronologically-ordered segments
+(defn squeue-gen [] (pqueue (gen/fmap #(sort-by :timestamp %)
+                                      (gen/list
+                                       (s/gen :rebecca.history/component)))))
+
 ;;; History: a succession of components
-(s/def :rebecca.history/components (s/coll-of
-                                    :rebecca.history/component
-                                    :kind persistent-queue?))
+(s/def :rebecca.history/components (s/with-gen
+                                     (s/coll-of :rebecca.history/component
+                                                :kind persistent-queue?)
+                                     squeue-gen))
 (s/def :rebecca.history/start-time inst?)
 (s/def :rebecca.history/end-time inst?)
 (s/def :rebecca.history/meta (s/keys :req-un [:rebecca/tokens]))
