@@ -12,7 +12,9 @@
 ;;; Component: a textual piece of information said by someone
 (s/def :rebecca.component/speaker string?)
 (s/def :rebecca.component/text string?)
-(s/def :rebecca.component/timestamp inst?)
+(s/def :rebecca.component/timestamp (s/with-gen inst?
+                                      #(gen/fmap (fn [s] (Instant/ofEpochSecond s))
+                                                 (s/gen int?))))
 (s/def :rebecca.component/meta (s/keys :req-un [:rebecca/tokens]
                                        :opt-un [:rebecca.component/expansion]))
 (s/def :rebecca/component (s/keys :req-un [:rebecca.component/text
@@ -65,12 +67,14 @@
                 (or (= start-time end-time)
                     (.isBefore start-time end-time))))))
 
-(s/def :rebecca/history (s/keys :req-un [:rebecca.history/components
-                                         :rebecca.history/start-time
-                                         :rebecca.history/end-time]
-                                :gen #(gen/fmap
-                                       history
-                                       (s/gen :rebecca.history/components))))
+(s/def :rebecca/history (s/and
+                         (s/keys :req-un [:rebecca.history/components
+                                          :rebecca.history/start-time
+                                          :rebecca.history/end-time]
+                                 :gen #(gen/fmap
+                                        history
+                                        (s/gen :rebecca.history/components)))
+                         verify-hist-end-start))
 
 ;;; Context: a (potentially empty) history accompanied by auxiliary information
 (s/def :rebecca.context/agent string?)

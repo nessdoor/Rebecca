@@ -1,7 +1,6 @@
 (ns rebecca.context.history
   (:require [clojure.string :as cstr]
-            [clojure.spec.alpha :as s]
-            [rebecca.context.spec :refer [verify-hist-end-start]])
+            [clojure.spec.alpha :as s])
   (:import (java.time DateTimeException Instant)
            java.time.temporal.ChronoUnit))
 
@@ -28,7 +27,6 @@
   [& {:keys [tokens-estimator tokens-limit trim-factor] :as opts}]
   {:post [(s/valid? :rebecca/history %)
           (empty? (:components %))
-          (verify-hist-end-start %)
           (s/valid? :rebecca.history/meta (meta %))
           (= 0 (:tokens (meta %)))]}
    (with-meta
@@ -45,7 +43,6 @@
           (contains? (meta h) :tokens-limit)]
     :post [(s/valid? :rebecca/history %)
            (s/valid? :rebecca.history/meta (meta %))
-           (verify-hist-end-start %)
            (let [{:keys [tokens tokens-limit]} (meta %)]
              (<= tokens tokens-limit))]}
   (let [{:keys [tokens tokens-limit trim-factor]
@@ -85,7 +82,6 @@
     :post [(s/valid? :rebecca/history %)
            (= (:components %)
               (concat (:components hist) cs))
-           (verify-hist-end-start %)
            (s/valid? :rebecca.history/meta (meta %))
            (= (:tokens (meta %))
               (reduce + (:tokens (meta hist))
@@ -115,7 +111,6 @@
                 time (:timestamp (first cs))]
             (or (= end time) (.isBefore end time)))]
     :post [(s/valid? :rebecca/history %)
-           (verify-hist-end-start %)
            (s/valid? :rebecca.history/meta (meta %))
            (let [{:keys [tokens tokens-limit]} (meta %)]
              (or (nil? tokens-limit)
