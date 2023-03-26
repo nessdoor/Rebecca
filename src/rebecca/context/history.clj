@@ -36,36 +36,20 @@
       :start-time (Instant/MIN) :end-time (Instant/MIN)}
      (merge {:tokens 0} opts)))
 
-(defn h-conj
-  ([] (history))
-  ([hist] hist)
-  ([hist component]
-   {:pre [(s/valid? :rebecca/history hist)
-          (s/valid? :rebecca.history/meta (meta hist))
-          (s/valid? :rebecca/component component)
-          (s/valid? :rebecca.component/meta (meta component))]
-    :post [(s/valid? :rebecca/history %)
-           (= 1 (count (:components %)))
-           (= component (peek (:components %)))
-           (verify-hist-end-start %)
-           (s/valid? :rebecca.history/meta (meta %))
-           (= (:tokens (meta component)) (:tokens (meta %)))]}
-   (with-meta
-     (merge hist
-            (let [cs (conj (:components hist) component)
-                  {start :timestamp} (peek cs)
-                  {end :timestamp} component]
-              {:components cs :start-time start :end-time end}))
-     (let [mhist (meta hist)
-           {ts :tokens} mhist
-           {t :tokens} (meta component)]
-       (assoc mhist :tokens (+ ts t)))))
-  ([hist c & cs]
-   (reduce h-conj (h-conj hist c) cs)))
+(defn h-empty? [h] (empty? (:components h)))
 
-(defn trim-history
+(defn h-trim
   [h]
-  (let [{:keys [tokens tokens-limit trim-factor] :or {trim-factor 1}} (meta h)
+   {:pre [(s/valid? :rebecca/history h)
+          (s/valid? :rebecca.history/meta (meta h))
+          (contains? (meta h) :tokens-limit)]
+    :post [(s/valid? :rebecca/history %)
+           (s/valid? :rebecca.history/meta (meta %))
+           (verify-hist-end-start %)
+           (let [{:keys [tokens tokens-limit]} (meta %)]
+             (<= tokens tokens-limit))]}
+  (let [{:keys [tokens tokens-limit trim-factor]
+         :or {trim-factor default-trim-factor}} (meta h)
         {:keys [components]} h]
     ;; Pop from history until we have recouped enough tokens
     (loop [cmps components
@@ -80,6 +64,67 @@
                    ;; Start time equal to the timestamp of the 1st component
                    :start-time (:timestamp (peek cmps))})
          merge {:tokens (- tokens recouped)})))))
+
+(defn enq-keep-time
+  [queue cs last]
+  (if (seq cs)
+    (let [fc (first cs)]
+      (recur (conj queue fc) (next cs) (:timestamp fc)))
+    [queue last]))
+
+(defn h-conj-unchecked
+  ([]
+   {:post [(s/valid? :rebecca/history %)
+           (h-empty? %)]} (history))
+  ([hist] {:post [(identical? hist %)]} hist)
+  ([hist & cs]
+   {:pre [(s/valid? :rebecca/history hist)
+          (s/valid? :rebecca.history/meta (meta hist))
+          (s/valid? (s/* :rebecca/component) cs)
+          (s/valid? (s/* :rebecca.component/meta) (map meta cs))]
+    :post [(s/valid? :rebecca/history %)
+           (= (:components %)
+              (concat (:components hist) cs))
+           (verify-hist-end-start %)
+           (s/valid? :rebecca.history/meta (meta %))
+           (= (:tokens (meta %))
+              (reduce + (:tokens (meta hist))
+                      (map (fn [c] (:tokens (meta c))) cs)))]}
+   (with-meta
+     (merge hist
+            (let [[ccs end] (enq-keep-time
+                             (:components hist) cs (:end-time hist))
+                  {start :timestamp} (peek ccs)]
+              {:components ccs :start-time start :end-time end}))
+     (let [mhist (meta hist)
+           {t :tokens} mhist
+           ts (reduce + (map #(:tokens (meta %)) cs))]
+       (assoc mhist :tokens (+ t ts))))))
+
+(defn h-conj
+  ([]
+   {:post [(s/valid? :rebecca/history %)
+           (h-empty? %)]} (history))
+  ([hist] {:post [(identical? hist %)]} hist)
+  ([hist & cs]
+   {:pre [(s/valid? :rebecca/history hist)
+          (s/valid? :rebecca.history/meta (meta hist))
+          (s/valid? (s/+ :rebecca/component) cs)
+          (s/valid? (s/+ :rebecca.component/meta) (map meta cs))
+          (let [end (:end-time hist)
+                time (:timestamp (first cs))]
+            (or (= end time) (.isBefore end time)))]
+    :post [(s/valid? :rebecca/history %)
+           (verify-hist-end-start %)
+           (s/valid? :rebecca.history/meta (meta %))
+           (let [{:keys [tokens tokens-limit]} (meta %)]
+             (or (nil? tokens-limit)
+                 (<= tokens tokens-limit)))]}
+   (let [result (apply h-conj-unchecked hist cs)
+         {htok :tokens htlim :tokens-limit} (meta result)]
+     (if (and htlim (> htok htlim))
+       (h-trim result)
+       result))))
 
 (defn ccat-uncapped
   [l r]
