@@ -72,17 +72,21 @@
 (defn h-conj-unchecked
   ([]
    {:post [(s/valid? :rebecca/history %)
+           (s/valid? :rebecca.history/meta (meta %))
            (h-empty? %)]} (history))
   ([hist] {:post [(identical? hist %)]} hist)
   ([hist & cs]
    {:pre [(s/valid? :rebecca/history hist)
           (s/valid? :rebecca.history/meta (meta hist))
           (s/valid? (s/* :rebecca/component) cs)
-          (s/valid? (s/* :rebecca.component/meta) (map meta cs))]
+          (s/valid? (s/* :rebecca.component/meta) (map meta cs))
+          (let [end (:end-time hist)
+                time (:timestamp (first cs))]
+            (or (nil? end) (= end time) (.isBefore end time)))]
     :post [(s/valid? :rebecca/history %)
+           (s/valid? :rebecca.history/meta (meta %))
            (= (:components %)
               (concat (:components hist) cs))
-           (s/valid? :rebecca.history/meta (meta %))
            (= (:tokens (meta %))
               (reduce + (:tokens (meta hist))
                       (map (fn [c] (:tokens (meta c))) cs)))]}
