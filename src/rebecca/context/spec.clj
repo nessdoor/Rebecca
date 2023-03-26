@@ -6,18 +6,18 @@
 ;;; Token count: number of tokens of which a certain text is composed of
 (s/def :rebecca/tokens number?)
 
-;;; Expansion: textual expansion of a segment
-(s/def :rebecca.history/expansion string?)
+;;; Expansion: textual expansion of a component
+(s/def :rebecca.component/expansion string?)
 
 ;;; Component: a textual piece of information said by someone
-(s/def :rebecca.history/speaker string?)
-(s/def :rebecca.history/text string?)
-(s/def :rebecca.history/timestamp inst?)
-(s/def :rebecca.history/component-meta (s/keys :req-un [:rebecca/tokens]
-                                               :opt-un [:rebecca.history/expansion]))
-(s/def :rebecca.history/component (s/keys :req-un [:rebecca.history/text
-                                                   :rebecca.history/timestamp]
-                                          :opt-un [:rebecca.history/speaker]))
+(s/def :rebecca.component/speaker string?)
+(s/def :rebecca.component/text string?)
+(s/def :rebecca.component/timestamp inst?)
+(s/def :rebecca.component/meta (s/keys :req-un [:rebecca/tokens]
+                                       :opt-un [:rebecca.component/expansion]))
+(s/def :rebecca/component (s/keys :req-un [:rebecca.component/text
+                                           :rebecca.component/timestamp]
+                                  :opt-un [:rebecca.component/speaker]))
 
 ;;; Verify whether the given object is a Clojure persistent queue
 (def persistent-queue? #(instance? clojure.lang.PersistentQueue %))
@@ -33,7 +33,7 @@
 
 ;;; History: a succession of components
 (s/def :rebecca.history/components (s/with-gen
-                                     (s/coll-of :rebecca.history/component
+                                     (s/coll-of :rebecca/component
                                                 :kind persistent-queue?)
                                      squeue-gen))
 (s/def :rebecca.history/start-time inst?)
@@ -46,12 +46,25 @@
                                      :opt-un [:rebecca.history/tokens-limit
                                               :rebecca.history/trim-factor
                                               :rebecca.history/tokens-estimator]))
+;;; Generate a conforming history object
 (defn history [q] (merge
                    {:components q}
                    (if (empty? q)
                      {:start-time (Instant/MIN) :end-time (Instant/MIN)}
                      {:start-time (:timestamp (peek q))
                       :end-time (:timestamp (last q))})))
+
+;;; Verify consistency of :start-time and :end-time w.r.t. components
+(defn verify-hist-end-start [h]
+  (let [{:keys [components start-time end-time]} h]
+       (or (and (empty? components)
+                (= start-time (Instant/MIN))
+                (= end-time (Instant/MIN)))
+           (and (= start-time (:timestamp (peek components)))
+                (= end-time (:timestamp (last components)))
+                (or (= start-time end-time)
+                    (.isBefore start-time end-time))))))
+
 (s/def :rebecca/history (s/keys :req-un [:rebecca.history/components
                                          :rebecca.history/start-time
                                          :rebecca.history/end-time]

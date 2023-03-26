@@ -1,24 +1,57 @@
-(ns rebecca.context.concat
-  (:require [clojure.string :as cstr])
-  (:import java.time.DateTimeException
+(ns rebecca.context.history
+  (:require [clojure.string :as cstr]
+            [clojure.spec.alpha :as s]
+            [rebecca.context.spec :refer [verify-hist-end-start]])
+  (:import (java.time DateTimeException Instant)
            java.time.temporal.ChronoUnit))
-
-(def default-token-limit 2048)
-
-(def default-trim-factor 3/4)
 
 (def default-token-estimator (fn [seg-text]
                                (* 4/3
                                   (count (cstr/split seg-text #"\s+")))))
 
-(defn to-history
-  [component]
+(def default-token-limit 2048)
+
+(def default-trim-factor 3/4)
+
+(defn component
+  [text & {:keys [timestamp tokens speaker] :as opts
+           :or {timestamp (Instant/now)
+                tokens (default-token-estimator text)}}]
+  {:post [(s/valid? :rebecca/component %)
+          (s/valid? :rebecca.component/meta (meta %))]}
+   (with-meta
+     (merge {:text text :timestamp timestamp}
+            (if speaker {:speaker speaker}))
+     {:tokens tokens}))
+
+(defn history
+  [& {:keys [tokens-estimator tokens-limit trim-factor] :as opts}]
+  {:post [(s/valid? :rebecca/history %)
+          (empty? (:components %))
+          (verify-hist-end-start %)
+          (s/valid? :rebecca.history/meta (meta %))
+          (= 0 (:tokens (meta %)))]}
+   (with-meta
+     {:components clojure.lang.PersistentQueue/EMPTY
+      :start-time (Instant/MIN) :end-time (Instant/MIN)}
+     (merge {:tokens 0} opts)))
+
+(defn component->history
+  [component & {:keys [tokens-estimator tokens-limit trim-factor] :as opts}]
+  {:pre [(s/valid? :rebecca/component component)
+         (s/valid? :rebecca.component/meta (meta component))]
+   :post [(s/valid? :rebecca/history %)
+          (= 1 (count (:components %)))
+          (= component (peek (:components %)))
+          (verify-hist-end-start %)
+          (s/valid? :rebecca.history/meta (meta %))
+          (= (:tokens (meta component)) (:tokens (meta %)))]}
   (let [{:keys [timestamp]} component
         {:keys [tokens]} (meta component)]
     (with-meta
       {:components (conj clojure.lang.PersistentQueue/EMPTY component)
        :start-time timestamp :end-time timestamp}
-      {:tokens tokens})))
+      (merge {:tokens tokens} opts))))
 
 (defn trim-history
   [h]

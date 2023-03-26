@@ -3,7 +3,7 @@
             [clojure.string :as cstr]
             (rebecca.context [ops :refer [default-agent default-speaker make-prompt
                                           context +facts +input epsilon-extend]]
-                             [concat :refer [ccat]])
+                             [history :refer [ccat]])
             [rebecca.completions.openai :as roai]
             [telegrambot-lib.core :as tbot])
   (:import java.time.Instant))

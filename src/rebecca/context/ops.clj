@@ -1,5 +1,5 @@
 (ns rebecca.context.ops
-  (:require [rebecca.context.concat :refer [ccat to-history
+  (:require [rebecca.context.history :refer [ccat history component->history
                                             default-token-estimator
                                             default-token-limit
                                             default-trim-factor]])
@@ -42,7 +42,7 @@
   (let [{agent :agent testim :tokens-estimator
          :or {agent default-agent testim default-token-estimator}} hist]
     (ccat hist
-          (to-history
+          (component->history
            (let [text (str agent " knows that: " facts)]
              (with-meta
                {:text text
@@ -58,7 +58,7 @@
         {testim :tokens-estimator
          :or {testim default-token-estimator}} (meta hist)]
     (ccat hist
-          (to-history
+          (component->history
            (with-meta {:speaker isp
                        ;; Reuse expansion for representing the input text
                        :text (subs expa (count prompt))
@@ -70,4 +70,4 @@
   [ctxt compl-backend & {:as model-params}]
   (let [answer (compl-backend ctxt model-params)] ; Answer from the API
     ;; First return value is the completion, while second is the extended context
-    [answer (ccat ctxt (to-history answer))]))
+    [answer (ccat ctxt (component->history answer))]))
