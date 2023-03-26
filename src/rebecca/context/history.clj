@@ -31,8 +31,7 @@
           (s/valid? :rebecca.history/meta (meta %))
           (= 0 (:tokens (meta %)))]}
    (with-meta
-     {:components clojure.lang.PersistentQueue/EMPTY
-      :start-time (Instant/MIN) :end-time (Instant/MIN)}
+     {:components clojure.lang.PersistentQueue/EMPTY}
      (merge {:tokens 0} opts)))
 
 (defn h-empty? [h] (empty? (:components h)))
@@ -110,7 +109,7 @@
           (s/valid? (s/+ :rebecca.component/meta) (map meta cs))
           (let [end (:end-time hist)
                 time (:timestamp (first cs))]
-            (or (= end time) (.isBefore end time)))]
+            (or (nil? end) (= end time) (.isBefore end time)))]
     :post [(s/valid? :rebecca/history %)
            (s/valid? :rebecca.history/meta (meta %))
            (let [{:keys [tokens tokens-limit]} (meta %)]
@@ -132,7 +131,8 @@
           (s/valid? :rebecca.history/meta (meta r))
           (let [{lend :end-time} l
                 {rbeg :start-time} r]
-            (or (= lend rbeg)
+            (or (nil? lend) (nil? rbeg)
+                (= lend rbeg)
                 (.isBefore lend rbeg)))]
     :post [(s/valid? :rebecca/history %)
            (s/valid? :rebecca.history/meta (meta %))
@@ -146,11 +146,8 @@
     (merge l r
            {:components (into (:components l) (:components r))
             ;; The time ranges of empty histories must be overridden
-            :start-time (let [{lstart :start-time} l
-                              {rstart :start-time} r]
-                          (if (= (Instant/MIN) lstart)
-                            rstart lstart))
-            :end-time (:end-time r)})
+            :start-time (:start-time l (:start-time r))
+            :end-time (:end-time r (:end-time l))})
     ;; Metadata is merged from right to left, and token count is summed
      (merge (meta r) (meta l)
             {:tokens (+ (:tokens (meta l)) (:tokens (meta r)))})))
@@ -167,7 +164,8 @@
           (s/valid? :rebecca.history/meta (meta r))
           (let [{lend :end-time} l
                 {rbeg :start-time} r]
-            (or (= lend rbeg)
+            (or (nil? lend) (nil? rbeg)
+                (= lend rbeg)
                 (.isBefore lend rbeg)))]
     :post [(s/valid? :rebecca/history %)
            (s/valid? :rebecca.history/meta (meta %))

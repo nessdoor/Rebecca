@@ -63,25 +63,20 @@
                                               :rebecca.history/trim-factor
                                               :rebecca.history/tokens-estimator]))
 ;;; Generate a conforming history object
-(defn history [q] (merge
-                   {:components q}
-                   (if (empty? q)
-                     {:start-time (Instant/MIN) :end-time (Instant/MIN)}
-                     {:start-time (:timestamp (peek q))
-                      :end-time (:timestamp (last q))})))
+(defn history [q] (merge {:components q}
+                         (if (seq q)
+                           {:start-time (:timestamp (peek q))
+                            :end-time (:timestamp (last q))})))
 
 ;;; Verify consistency of :start-time and :end-time w.r.t. components
 (defn verify-hist-end-start [h]
   (let [{:keys [components start-time end-time]} h]
-       (or (and (empty? components)
-                (= start-time (Instant/MIN))
-                (= end-time (Instant/MIN)))
-           (and (= start-time (:timestamp (peek components)))
-                (= end-time (:timestamp (last components)))))))
+    (and (= start-time (:timestamp (peek components)))
+         (= end-time (:timestamp (last components))))))
 
 (s/def :rebecca/history (s/and
-                         (s/keys :req-un [:rebecca.history/components
-                                          :rebecca.history/start-time
+                         (s/keys :req-un [:rebecca.history/components]
+                                 :opt-un [:rebecca.history/start-time
                                           :rebecca.history/end-time]
                                  :gen #(gen/fmap
                                         history
