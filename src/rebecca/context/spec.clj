@@ -1,6 +1,7 @@
 (ns rebecca.context.spec
   (:require [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as gen]))
+            [clojure.spec.gen.alpha :as gen])
+  (:import java.time.Instant))
 
 ;;; Token count: number of tokens of which a certain text is composed of
 (s/def :rebecca/tokens number?)
@@ -45,15 +46,17 @@
                                      :opt-un [:rebecca.history/tokens-limit
                                               :rebecca.history/trim-factor
                                               :rebecca.history/tokens-estimator]))
+(defn history [q] (merge
+                   {:components q}
+                   (if (empty? q)
+                     {:start-time (Instant/MIN) :end-time (Instant/MIN)}
+                     {:start-time (:timestamp (peek q))
+                      :end-time (:timestamp (last q))})))
 (s/def :rebecca/history (s/keys :req-un [:rebecca.history/components
                                          :rebecca.history/start-time
                                          :rebecca.history/end-time]
                                 :gen #(gen/fmap
-                                       (fn [cs] {:components cs
-                                                 :start-time
-                                                 (:timestamp (peek cs))
-                                                 :end-time
-                                                 (:timestamp (last cs))})
+                                       history
                                        (s/gen :rebecca.history/components))))
 
 ;;; Context: a (potentially empty) history accompanied by auxiliary information
