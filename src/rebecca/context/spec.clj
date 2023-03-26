@@ -33,10 +33,24 @@
                                       (gen/list
                                        (s/gen :rebecca/component)))))
 
+(defn chrono-ordered?
+  ([] true)
+  ([coll]
+   (loop [prec (Instant/MIN), rst coll]
+     (if (seq rst)
+       (let [{succ :timestamp} (first rst)]
+         (if (or (= prec succ)
+                 (.isBefore prec succ))
+           (recur succ (next rst))
+           false))
+       true))))
+
 ;;; History: a succession of components
 (s/def :rebecca.history/components (s/with-gen
-                                     (s/coll-of :rebecca/component
-                                                :kind persistent-queue?)
+                                     (s/and
+                                      (s/coll-of :rebecca/component
+                                                 :kind persistent-queue?)
+                                      #(chrono-ordered? %))
                                      squeue-gen))
 (s/def :rebecca.history/start-time inst?)
 (s/def :rebecca.history/end-time inst?)
@@ -63,9 +77,7 @@
                 (= start-time (Instant/MIN))
                 (= end-time (Instant/MIN)))
            (and (= start-time (:timestamp (peek components)))
-                (= end-time (:timestamp (last components)))
-                (or (= start-time end-time)
-                    (.isBefore start-time end-time))))))
+                (= end-time (:timestamp (last components)))))))
 
 (s/def :rebecca/history (s/and
                          (s/keys :req-un [:rebecca.history/components
