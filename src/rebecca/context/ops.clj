@@ -1,5 +1,5 @@
 (ns rebecca.context.ops
-  (:require [rebecca.context.history :refer [ccat history component->history
+  (:require [rebecca.context.history :refer [ccat history h-conj
                                             default-token-estimator
                                             default-token-limit
                                             default-trim-factor]])
@@ -41,13 +41,12 @@
   [hist facts]
   (let [{agent :agent testim :tokens-estimator
          :or {agent default-agent testim default-token-estimator}} hist]
-    (ccat hist
-          (component->history
-           (let [text (str agent " knows that: " facts)]
-             (with-meta
-               {:text text
-                :timestamp (Instant/now)}
-               {:tokens (testim text)}))))))
+    (h-conj hist
+            (let [text (str agent " knows that: " facts)]
+              (with-meta
+                {:text text
+                 :timestamp (Instant/now)}
+                {:tokens (testim text)})))))
 
 (defn +input
   [hist input & {ctime :timestamp sp :speaker
@@ -57,17 +56,16 @@
         expa (str prompt input)
         {testim :tokens-estimator
          :or {testim default-token-estimator}} (meta hist)]
-    (ccat hist
-          (component->history
-           (with-meta {:speaker isp
-                       ;; Reuse expansion for representing the input text
-                       :text (subs expa (count prompt))
-                       :timestamp ctime}
-             {:expansion expa            ; Caching expansion speeds up concat
-              :tokens (testim expa)})))))
+    (h-conj hist
+            (with-meta {:speaker isp
+                        ;; Reuse expansion for representing the input text
+                        :text (subs expa (count prompt))
+                        :timestamp ctime}
+              {:expansion expa            ; Caching expansion speeds up concat
+               :tokens (testim expa)}))))
 
 (defn epsilon-extend
   [ctxt compl-backend & {:as model-params}]
   (let [answer (compl-backend ctxt model-params)] ; Answer from the API
     ;; First return value is the completion, while second is the extended context
-    [answer (ccat ctxt (component->history answer))]))
+    [answer (h-conj ctxt answer)]))

@@ -36,22 +36,32 @@
       :start-time (Instant/MIN) :end-time (Instant/MIN)}
      (merge {:tokens 0} opts)))
 
-(defn component->history
-  [component & {:keys [tokens-estimator tokens-limit trim-factor] :as opts}]
-  {:pre [(s/valid? :rebecca/component component)
-         (s/valid? :rebecca.component/meta (meta component))]
-   :post [(s/valid? :rebecca/history %)
-          (= 1 (count (:components %)))
-          (= component (peek (:components %)))
-          (verify-hist-end-start %)
-          (s/valid? :rebecca.history/meta (meta %))
-          (= (:tokens (meta component)) (:tokens (meta %)))]}
-  (let [{:keys [timestamp]} component
-        {:keys [tokens]} (meta component)]
-    (with-meta
-      {:components (conj clojure.lang.PersistentQueue/EMPTY component)
-       :start-time timestamp :end-time timestamp}
-      (merge {:tokens tokens} opts))))
+(defn h-conj
+  ([] (history))
+  ([hist] hist)
+  ([hist component]
+   {:pre [(s/valid? :rebecca/history hist)
+          (s/valid? :rebecca.history/meta (meta hist))
+          (s/valid? :rebecca/component component)
+          (s/valid? :rebecca.component/meta (meta component))]
+    :post [(s/valid? :rebecca/history %)
+           (= 1 (count (:components %)))
+           (= component (peek (:components %)))
+           (verify-hist-end-start %)
+           (s/valid? :rebecca.history/meta (meta %))
+           (= (:tokens (meta component)) (:tokens (meta %)))]}
+   (with-meta
+     (merge hist
+            (let [cs (conj (:components hist) component)
+                  {start :timestamp} (peek cs)
+                  {end :timestamp} component]
+              {:components cs :start-time start :end-time end}))
+     (let [mhist (meta hist)
+           {ts :tokens} mhist
+           {t :tokens} (meta component)]
+       (assoc mhist :tokens (+ ts t)))))
+  ([hist c & cs]
+   (reduce h-conj (h-conj hist c) cs)))
 
 (defn trim-history
   [h]
