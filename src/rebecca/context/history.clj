@@ -1,6 +1,7 @@
 (ns rebecca.context.history
   (:require [clojure.string :as cstr]
-            [clojure.spec.alpha :as s])
+            [clojure.spec.alpha :as s]
+            [rebecca.context.spec])
   (:import (java.time DateTimeException Instant)
            java.time.temporal.ChronoUnit))
 
@@ -121,33 +122,70 @@
        (h-trim result)
        result))))
 
-(defn ccat-uncapped
-  [l r]
-  (vary-meta
-   ;; Create a new history concatenating the left and right segments
-   (merge l
-          ;; Concatenate queues
-          {:components
-           (into (:components l clojure.lang.PersistentQueue/EMPTY)
-                 (:components r))}
-          ;; Merge time ranges, respecting timeless segments
-          (if (or (contains? l :start-time)
-                  (contains? r :start-time))
-            {:start-time (:start-time l (:start-time r))})
-          (if (or (contains? r :end-time)
-                  (contains? l :end-time))
-            {:end-time (:end-time r (:end-time l))}))
-   ;; Metadata is merged, and token count is summed
-   merge (meta r) {:tokens (+ (:tokens (meta l))
-                              (:tokens (meta r)))}))
+(defn h-concat-unchecked
+  ([] nil)
+  ([l] {:post [(identical? l %)]} l)
+  ([l r]
+   {:pre [(s/valid? :rebecca/history l)
+          (s/valid? :rebecca.history/meta (meta l))
+          (s/valid? :rebecca/history r)
+          (s/valid? :rebecca.history/meta (meta r))
+          (let [{lend :end-time} l
+                {rbeg :start-time} r]
+            (or (= lend rbeg)
+                (.isBefore lend rbeg)))]
+    :post [(s/valid? :rebecca/history %)
+           (s/valid? :rebecca.history/meta (meta %))
+           (= (:components %)
+              (concat (:components l) (:components r)))
+           (= (:tokens (meta %))
+              (+ (:tokens (meta l))
+                 (:tokens (meta r))))]}
+   (with-meta
+    ;; Extra keys of rightmost history take precedence
+    (merge l r
+           {:components (into (:components l) (:components r))
+            ;; The time ranges of empty histories must be overridden
+            :start-time (let [{lstart :start-time} l
+                              {rstart :start-time} r]
+                          (if (= (Instant/MIN) lstart)
+                            rstart lstart))
+            :end-time (:end-time r)})
+    ;; Metadata is merged from right to left, and token count is summed
+     (merge (meta r) (meta l)
+            {:tokens (+ (:tokens (meta l)) (:tokens (meta r)))})))
+  ([l r & rs]
+   (reduce h-concat-unchecked (h-concat-unchecked l r) rs)))
 
-(defn ccat
-  [l r]
-  (let [result (ccat-uncapped l r) ; Unchecked history concatenation
-        {ctok :tokens ctlim :tokens-limit} (meta result)]
-    ;; If there is a limit on the total number of tokens and this has been
-    ;; surpassed, trim history
-    (if (and ctlim
-             (> ctok ctlim))
-      (trim-history result)
-      result)))
+(defn h-concat
+  ([] nil)
+  ([l] {:post [(identical? l %)]} l)
+  ([l r]
+   {:pre [(s/valid? :rebecca/history l)
+          (s/valid? :rebecca.history/meta (meta l))
+          (s/valid? :rebecca/history r)
+          (s/valid? :rebecca.history/meta (meta r))
+          (let [{lend :end-time} l
+                {rbeg :start-time} r]
+            (or (= lend rbeg)
+                (.isBefore lend rbeg)))]
+    :post [(s/valid? :rebecca/history %)
+           (s/valid? :rebecca.history/meta (meta %))
+           (let [{:keys [tokens tokens-limit]} (meta %)]
+             (or (nil? tokens-limit)
+                 (<= tokens tokens-limit)))]}
+   (let [result (h-concat-unchecked l r) ; Unchecked history concatenation
+         {ctok :tokens ctlim :tokens-limit} (meta result)]
+     ;; If there is a limit on the total number of tokens and this has been
+     ;; surpassed, trim history
+     (if (and ctlim
+              (> ctok ctlim))
+       (h-trim result)
+       result)))
+  ([l r & rs]
+   (let [result (apply h-concat-unchecked l r rs)
+         {ctok :tokens ctlim :tokens-limit} (meta result)]
+     (if (and ctlim
+              (> ctok ctlim))
+       (h-trim result)
+       result))))

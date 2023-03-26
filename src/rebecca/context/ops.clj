@@ -1,5 +1,5 @@
 (ns rebecca.context.ops
-  (:require [rebecca.context.history :refer [ccat history h-conj
+  (:require [rebecca.context.history :refer [h-concat history h-conj
                                             default-token-estimator
                                             default-token-limit
                                             default-trim-factor]])
