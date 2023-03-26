@@ -29,7 +29,7 @@
 ;;; Generate persistent queues of chronologically-ordered segments
 (defn squeue-gen [] (pqueue (gen/fmap #(sort-by :timestamp %)
                                       (gen/list
-                                       (s/gen :rebecca.history/component)))))
+                                       (s/gen :rebecca/component)))))
 
 ;;; History: a succession of components
 (s/def :rebecca.history/components (s/with-gen
