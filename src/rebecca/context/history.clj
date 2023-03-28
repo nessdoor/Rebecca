@@ -1,13 +1,15 @@
 (ns rebecca.context.history
   (:require [clojure.string :as cstr]
             [clojure.spec.alpha :as s]
+            [clojure.math :refer [round]]
             [rebecca.context.spec])
   (:import (java.time DateTimeException Instant)
            java.time.temporal.ChronoUnit))
 
 (def default-token-estimator (fn [seg-text]
-                               (* 4/3
-                                  (count (cstr/split seg-text #"\s+")))))
+                               (round
+                                (* 4/3
+                                   (count (cstr/split seg-text #"\s+"))))))
 
 (def default-token-limit 2048)
 
