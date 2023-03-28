@@ -17,9 +17,16 @@
                                                  (s/gen int?))))
 (s/def :rebecca.component/meta (s/keys :req-un [:rebecca/tokens]
                                        :opt-un [:rebecca.component/expansion]))
-(s/def :rebecca/component (s/keys :req-un [:rebecca.component/text
-                                           :rebecca.component/timestamp]
-                                  :opt-un [:rebecca.component/speaker]))
+(s/def :rebecca/component (let [comp-spec
+                                (s/keys :req-un [:rebecca.component/text
+                                                 :rebecca.component/timestamp]
+                                        :opt-un [:rebecca.component/speaker])]
+                            (s/with-gen comp-spec
+                              #(gen/bind
+                                (s/gen comp-spec)
+                                (fn [c] (gen/fmap
+                                         (fn [m] (with-meta c m))
+                                         (s/gen :rebecca.component/meta)))))))
 
 ;;; Verify whether the given object is a Clojure persistent queue
 (def persistent-queue? #(instance? clojure.lang.PersistentQueue %))
@@ -74,14 +81,28 @@
     (and (= start-time (:timestamp (peek components)))
          (= end-time (:timestamp (last components))))))
 
-(s/def :rebecca/history (s/and
-                         (s/keys :req-un [:rebecca.history/components]
-                                 :opt-un [:rebecca.history/start-time
-                                          :rebecca.history/end-time]
-                                 :gen #(gen/fmap
-                                        history
-                                        (s/gen :rebecca.history/components)))
-                         verify-hist-end-start))
+(s/def :rebecca/history (let [hist-spec
+                              (s/and
+                               (s/keys :req-un [:rebecca.history/components]
+                                       :opt-un [:rebecca.history/start-time
+                                                :rebecca.history/end-time]
+                                       :gen #(gen/fmap
+                                              history
+                                              (s/gen :rebecca.history/components)))
+                               verify-hist-end-start)]
+                          (s/with-gen hist-spec
+                            #(gen/bind
+                              (s/gen hist-spec)
+                              (fn [h]
+                                (gen/fmap
+                                 (fn [m]
+                                   (with-meta h
+                                     (assoc m :tokens
+                                            (reduce +
+                                                    (map (fn [cm]
+                                                           (:tokens (meta cm)))
+                                                         (:components h))))))
+                                 (s/gen :rebecca.history/meta)))))))
 
 ;;; Context: a (potentially empty) history accompanied by auxiliary information
 (s/def :rebecca.context/agent string?)
