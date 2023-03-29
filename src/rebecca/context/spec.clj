@@ -13,8 +13,14 @@
 (s/def :rebecca.component/speaker string?)
 (s/def :rebecca.component/text string?)
 (s/def :rebecca.component/timestamp (s/with-gen inst?
-                                      #(gen/fmap (fn [s] (Instant/ofEpochSecond s))
-                                                 (s/gen int?))))
+                                      #(gen/fmap
+                                        (fn [s] (Instant/ofEpochSecond s))
+                                        (gen/such-that
+                                         (fn [s]
+                                           (<= (.getEpochSecond (Instant/MIN))
+                                               s
+                                               (.getEpochSecond (Instant/MAX))))
+                                         (s/gen int?)))))
 (s/def :rebecca.component/meta (s/keys :req-un [:rebecca/tokens]
                                        :opt-un [:rebecca.component/expansion]))
 (s/def :rebecca/component (let [comp-spec
