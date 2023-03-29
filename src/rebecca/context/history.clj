@@ -59,9 +59,13 @@
           (recur (pop cmps) tgoal (+ recouped ctok)))
         ;; Once the goal is reached, recreate history from the shortened queue
         (vary-meta
-         (merge h {:components cmps
-                   ;; Start time equal to the timestamp of the 1st component
-                   :start-time (:timestamp (peek cmps))})
+         (let [new-hist (assoc h :components cmps)
+               new-start (:timestamp (peek cmps))]
+           (if (nil? new-start)
+             ;; History is now empty, delete all time references
+             (dissoc new-hist :start-time :end-time)
+             ;; Start time equal to the timestamp of the 1st component
+             (assoc new-hist :start-time new-start)))
          merge {:tokens (- tokens recouped)})))))
 
 (defn enq-keep-time
