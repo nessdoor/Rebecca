@@ -68,7 +68,8 @@
 (s/def :rebecca.history/start-time inst?)
 (s/def :rebecca.history/end-time inst?)
 (s/def :rebecca.history/tokens-limit pos-int?)
-(s/def :rebecca.history/trim-factor number?)
+(s/def :rebecca.history/trim-factor (s/and number?
+                                           #(< 0 % 1)))
 (s/def :rebecca.history/tokens-estimator (s/fspec :args (s/cat :t string?)
                                                   :ret pos-int?))
 (s/def :rebecca.history/meta (s/keys :req-un [:rebecca/tokens]
