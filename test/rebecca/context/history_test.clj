@@ -28,3 +28,36 @@
                    (= (drop-while #(not= (peek (:components sh)) %)
                                   (:components lh))
                       (:components sh))))))
+
+;;; Verify conjoining of segments unto histories
+(ct/defspec conjoining
+  {:num-tests 100
+   :max-size 50}
+  (prop/for-all [[hist comps]
+                 (gen/let [{end :end-time :as hist} (s/gen :rebecca/history)
+                           ;; Generate components that are newer than history
+                           comps (gen/list
+                                  (gen/such-that
+                                   #(let [{ts :timestamp} %]
+                                      (or (nil? end)
+                                          (= end ts) (.isBefore end ts)))
+                                   (s/gen :rebecca/component) 50))]
+                   ;; Make sure that the list of components is sorted
+                   [hist (sort-by :timestamp comps)])]
+                (let [res (apply sut/h-conj-unchecked hist comps)]
+                  (and
+                   ;; Token conservation
+                   (= (:tokens (meta res))
+                      (reduce + (:tokens (meta hist))
+                              (map #(:tokens (meta %)) comps)))
+                   ;; New elements should have been appended
+                   (= (:components res)
+                      (concat (:components hist) comps))
+                   ;; Start time must be left unchanged, if it existed,
+                   ;; otherwise is that of the first component
+                   (= (:start-time res)
+                      (:start-time hist (:timestamp (first comps))))
+                   ;; End time is that of the last appended component, if any
+                   (= (:end-time res)
+                      (:timestamp (last comps) (:end-time hist)))))))
+
