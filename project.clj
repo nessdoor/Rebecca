@@ -1,5 +1,5 @@
 (defproject rebecca "0.1.0-SNAPSHOT"
-  :description "FIXME: write description"
+  :description "An augmented neural conversational agent"
   :url "http://example.com/FIXME"
   :license {:name "Mozilla Public License Version 2.0"
             :url "http://mozilla.org/MPL/2.0/"}
