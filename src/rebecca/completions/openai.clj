@@ -1,7 +1,7 @@
 (ns rebecca.completions.openai
   (:require [clojure.string :as cstr]
             [wkok.openai-clojure.api :as oai]
-            [rebecca.context.ops :refer [make-prompt]])
+            [rebecca.context :refer [make-prompt]])
   (:import java.time.Instant
            java.time.temporal.ChronoUnit))
 

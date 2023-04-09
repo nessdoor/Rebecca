@@ -1,8 +1,8 @@
-(ns rebecca.context.history
+(ns rebecca.history
   (:require [clojure.string :as cstr]
             [clojure.spec.alpha :as s]
             [clojure.math :refer [round]]
-            [rebecca.context.spec])
+            [rebecca.history-spec])
   (:import (java.time DateTimeException Instant)
            java.time.temporal.ChronoUnit))
 

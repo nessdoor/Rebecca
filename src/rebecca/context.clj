@@ -1,8 +1,8 @@
-(ns rebecca.context.ops
-  (:require [rebecca.context.history :refer [h-concat history h-conj
-                                            default-token-estimator
-                                            default-token-limit
-                                            default-trim-factor]])
+(ns rebecca.context
+  (:require [rebecca.history :refer [h-concat history h-conj
+                                     default-token-estimator
+                                     default-token-limit
+                                     default-trim-factor]])
   (:import java.time.Instant
            java.time.temporal.ChronoUnit))
 

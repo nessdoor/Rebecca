@@ -1,6 +1,6 @@
-(ns rebecca.context.history-test
-  (:require (rebecca.context [history :as sut]
-                             [spec :as cs])
+(ns rebecca.history-test
+  (:require (rebecca [history :as sut]
+                     [history-spec :as hs])
             [clojure.spec.alpha :as s]
             [clojure.test :as t]
             [clojure.test.check :as tc]
