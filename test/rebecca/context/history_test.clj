@@ -44,7 +44,7 @@
                                    (s/gen :rebecca/component) 50))]
                    ;; Make sure that the list of components is sorted
                    [hist (sort-by :timestamp comps)])]
-                (let [res (apply sut/h-conj-unchecked hist comps)]
+                (let [res (apply sut/h-conj-unchecked hist comps)] ; Sample
                   (and
                    ;; Token conservation
                    (= (:tokens (meta res))
@@ -61,3 +61,36 @@
                    (= (:end-time res)
                       (:timestamp (last comps) (:end-time hist)))))))
 
+;;; Verify history concatenation
+(ct/defspec concatenation
+  {:num-tests 100
+   :max-size 50}
+  (prop/for-all [[{s1 :start-time e1 :end-time :as h1}
+                  {s2 :start-time e2 :end-time :as h2}]
+                 (gen/let [{end :end-time :as h1} (s/gen :rebecca/history)
+                           ;; Generate only components that are later than h1
+                           comps (gen/list
+                                  (gen/such-that
+                                   #(let [{ts :timestamp} %]
+                                      (or (nil? end)
+                                          (= end ts)
+                                          (.isBefore end ts)))
+                                   (s/gen :rebecca/component) 70))]
+                   ;; Create h2 from such components, so that it is later than h1
+                   [h1 (apply sut/h-conj-unchecked
+                        (sut/history)
+                        (sort-by :timestamp comps))])]
+                (let [res (sut/h-concat-unchecked h1 h2)] ; Sample
+                  ;; Time ranges either absent or they have been concatenated
+                  (or (not (or s1 s2))
+                      (= (:start-time res)
+                         (:start-time h1 (:start-time h2))))
+                  (or (not (or e1 e2))
+                      (= (:end-time res)
+                         (:end-time h2 (:end-time h1))))
+                  ;; Components have been concatenated
+                  (= (:components res)
+                     (concat (:components h1) (:components h2)))
+                  ;; The token counts have been added together
+                  (= (:tokens (meta res))
+                     (+ (:tokens (meta h1)) (:tokens (meta h2)))))))
