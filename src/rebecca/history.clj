@@ -75,7 +75,7 @@
       (recur (conj queue fc) (next cs) (:timestamp fc)))
     [queue last]))
 
-(defn h-conj-unchecked
+(defn h-conj
   ([]
    {:post [(s/valid? :rebecca/history %)
            (s/valid? :rebecca.history/meta (meta %))
@@ -107,31 +107,7 @@
            ts (reduce + (map #(:tokens (meta %)) cs))]
        (assoc mhist :tokens (+ t ts))))))
 
-(defn h-conj
-  ([]
-   {:post [(s/valid? :rebecca/history %)
-           (h-empty? %)]} (history))
-  ([hist] {:post [(identical? hist %)]} hist)
-  ([hist & cs]
-   {:pre [(s/valid? :rebecca/history hist)
-          (s/valid? :rebecca.history/meta (meta hist))
-          (s/valid? (s/+ :rebecca/component) cs)
-          (s/valid? (s/+ :rebecca.component/meta) (map meta cs))
-          (let [end (:end-time hist)
-                time (:timestamp (first cs))]
-            (or (nil? end) (= end time) (.isBefore end time)))]
-    :post [(s/valid? :rebecca/history %)
-           (s/valid? :rebecca.history/meta (meta %))
-           (let [{:keys [tokens tokens-limit]} (meta %)]
-             (or (nil? tokens-limit)
-                 (<= tokens tokens-limit)))]}
-   (let [result (apply h-conj-unchecked hist cs)
-         {htok :tokens htlim :tokens-limit} (meta result)]
-     (if (and htlim (> htok htlim))
-       (h-trim result)
-       result))))
-
-(defn h-concat-unchecked
+(defn h-concat
   ([] nil)
   ([l] {:post [(identical? l %)]} l)
   ([l r]
@@ -165,38 +141,4 @@
      (merge (meta r) (meta l)
             {:tokens (+ (:tokens (meta l)) (:tokens (meta r)))})))
   ([l r & rs]
-   (reduce h-concat-unchecked (h-concat-unchecked l r) rs)))
-
-(defn h-concat
-  ([] nil)
-  ([l] {:post [(identical? l %)]} l)
-  ([l r]
-   {:pre [(s/valid? :rebecca/history l)
-          (s/valid? :rebecca.history/meta (meta l))
-          (s/valid? :rebecca/history r)
-          (s/valid? :rebecca.history/meta (meta r))
-          (let [{lend :end-time} l
-                {rbeg :start-time} r]
-            (or (nil? lend) (nil? rbeg)
-                (= lend rbeg)
-                (.isBefore lend rbeg)))]
-    :post [(s/valid? :rebecca/history %)
-           (s/valid? :rebecca.history/meta (meta %))
-           (let [{:keys [tokens tokens-limit]} (meta %)]
-             (or (nil? tokens-limit)
-                 (<= tokens tokens-limit)))]}
-   (let [result (h-concat-unchecked l r) ; Unchecked history concatenation
-         {ctok :tokens ctlim :tokens-limit} (meta result)]
-     ;; If there is a limit on the total number of tokens and this has been
-     ;; surpassed, trim history
-     (if (and ctlim
-              (> ctok ctlim))
-       (h-trim result)
-       result)))
-  ([l r & rs]
-   (let [result (apply h-concat-unchecked l r rs)
-         {ctok :tokens ctlim :tokens-limit} (meta result)]
-     (if (and ctlim
-              (> ctok ctlim))
-       (h-trim result)
-       result))))
+   (reduce h-concat (h-concat l r) rs)))

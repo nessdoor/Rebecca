@@ -44,7 +44,7 @@
                                    (s/gen :rebecca/component) 50))]
                    ;; Make sure that the list of components is sorted
                    [hist (sort-by :timestamp comps)])]
-                (let [res (apply sut/h-conj-unchecked hist comps)] ; Sample
+                (let [res (apply sut/h-conj hist comps)] ; Sample
                   (and
                    ;; Token conservation
                    (= (:tokens (meta res))
@@ -77,10 +77,10 @@
                                           (.isBefore end ts)))
                                    (s/gen :rebecca/component) 70))]
                    ;; Create h2 from such components, so that it is later than h1
-                   [h1 (apply sut/h-conj-unchecked
+                   [h1 (apply sut/h-conj
                         (sut/history)
                         (sort-by :timestamp comps))])]
-                (let [res (sut/h-concat-unchecked h1 h2)] ; Sample
+                (let [res (sut/h-concat h1 h2)] ; Sample
                   ;; Time ranges either absent or they have been concatenated
                   (or (not (or s1 s2))
                       (= (:start-time res)
