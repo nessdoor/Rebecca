@@ -154,10 +154,13 @@
    (with-meta
     ;; Extra keys of rightmost history take precedence
     (merge l r
-           {:components (into (:components l) (:components r))
-            ;; The time ranges of empty histories must be overridden
-            :start-time (:start-time l (:start-time r))
-            :end-time (:end-time r (:end-time l))})
+           {:components (into (:components l) (:components r))}
+           ;; If both histories are empty, the resulting history shall not have
+           ;; a time range
+           (if (or (:start-time l) (:start-time r))
+             {:start-time (:start-time l (:start-time r))})
+           (if (or (:end-time l) (:end-time r))
+             {:end-time (:end-time r (:end-time l))}))
     ;; Metadata is merged from right to left, and token count is summed
      (merge (meta r) (meta l)
             {:tokens (+ (:tokens (meta l)) (:tokens (meta r)))})))
