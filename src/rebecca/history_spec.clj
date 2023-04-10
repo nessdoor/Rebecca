@@ -3,12 +3,6 @@
             [clojure.spec.gen.alpha :as gen])
   (:import java.time.Instant))
 
-;;; Token count: number of tokens of which a certain text is composed of
-(s/def :rebecca/tokens int?)
-
-;;; Expansion: textual expansion of a component
-(s/def :rebecca.component/expansion string?)
-
 ;;; Component: a textual piece of information said by someone
 (s/def :rebecca.component/speaker string?)
 (s/def :rebecca.component/text string?)
@@ -21,18 +15,9 @@
                                                s
                                                (.getEpochSecond (Instant/MAX))))
                                          (s/gen int?)))))
-(s/def :rebecca.component/meta (s/keys :req-un [:rebecca/tokens]
-                                       :opt-un [:rebecca.component/expansion]))
-(s/def :rebecca/component (let [comp-spec
-                                (s/keys :req-un [:rebecca.component/text
-                                                 :rebecca.component/timestamp]
-                                        :opt-un [:rebecca.component/speaker])]
-                            (s/with-gen comp-spec
-                              #(gen/bind
-                                (s/gen comp-spec)
-                                (fn [c] (gen/fmap
-                                         (fn [m] (with-meta c m))
-                                         (s/gen :rebecca.component/meta)))))))
+(s/def :rebecca/component (s/keys :req-un [:rebecca.component/text
+                                           :rebecca.component/timestamp]
+                                  :opt-un [:rebecca.component/speaker]))
 
 ;;; Verify whether the given object is a Clojure persistent queue
 (def persistent-queue? #(instance? clojure.lang.PersistentQueue %))
@@ -67,46 +52,24 @@
                                      squeue-gen))
 (s/def :rebecca.history/start-time inst?)
 (s/def :rebecca.history/end-time inst?)
-(s/def :rebecca.history/tokens-limit pos-int?)
-(s/def :rebecca.history/trim-factor (s/and number?
-                                           #(< 0 % 1)))
-(s/def :rebecca.history/tokens-estimator (s/fspec :args (s/cat :t string?)
-                                                  :ret pos-int?))
-(s/def :rebecca.history/meta (s/keys :req-un [:rebecca/tokens]
-                                     :opt-un [:rebecca.history/tokens-limit
-                                              :rebecca.history/trim-factor
-                                              :rebecca.history/tokens-estimator]))
-;;; Generate a conforming history object
+
+;;; (Generate a conforming history object)
 (defn history [q] (merge {:components q}
                          (if (seq q)
                            {:start-time (:timestamp (peek q))
                             :end-time (:timestamp (last q))})))
 
-;;; Verify consistency of :start-time and :end-time w.r.t. components
+;;; (Verify consistency of :start-time and :end-time w.r.t. components)
 (defn verify-hist-end-start [h]
   (let [{:keys [components start-time end-time]} h]
     (and (= start-time (:timestamp (peek components)))
          (= end-time (:timestamp (last components))))))
 
-(s/def :rebecca/history (let [hist-spec
-                              (s/and
-                               (s/keys :req-un [:rebecca.history/components]
-                                       :opt-un [:rebecca.history/start-time
-                                                :rebecca.history/end-time]
-                                       :gen #(gen/fmap
-                                              history
-                                              (s/gen :rebecca.history/components)))
-                               verify-hist-end-start)]
-                          (s/with-gen hist-spec
-                            #(gen/bind
-                              (s/gen hist-spec)
-                              (fn [h]
-                                (gen/fmap
-                                 (fn [m]
-                                   (with-meta h
-                                     (assoc m :tokens
-                                            (reduce +
-                                                    (map (fn [cm]
-                                                           (:tokens (meta cm)))
-                                                         (:components h))))))
-                                 (s/gen :rebecca.history/meta)))))))
+(s/def :rebecca/history (s/and
+                         (s/keys :req-un [:rebecca.history/components]
+                                 :opt-un [:rebecca.history/start-time
+                                          :rebecca.history/end-time]
+                                 :gen #(gen/fmap
+                                        history
+                                        (s/gen :rebecca.history/components)))
+                         verify-hist-end-start))

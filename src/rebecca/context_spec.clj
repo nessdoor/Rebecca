@@ -4,6 +4,29 @@
             [rebecca.history-spec])
   (:import java.time.Instant))
 
+;;; Token count: number of tokens of which a certain text is composed of
+(s/def :rebecca/tokens int?)
+
+;;; Expansion: textual expansion of a component
+(s/def :rebecca.component/expansion string?)
+
+;;; Component metadata expected or produced by context manipulation code
+(s/def :rebecca.component/meta (s/keys :req-un [:rebecca/tokens]
+                                       :opt-un [:rebecca.component/expansion]))
+
+;;; Token trimming parameters of contexts
+(s/def :rebecca.history/tokens-limit pos-int?)
+(s/def :rebecca.history/trim-factor (s/and number?
+                                           #(< 0 % 1)))
+(s/def :rebecca.history/tokens-estimator (s/fspec :args (s/cat :t string?)
+                                                  :ret pos-int?))
+
+;;; History metadata expected or produced by context manipulation code
+(s/def :rebecca.history/meta (s/keys :req-un [:rebecca/tokens]
+                                     :opt-un [:rebecca.history/tokens-limit
+                                              :rebecca.history/trim-factor
+                                              :rebecca.history/tokens-estimator]))
+
 ;;; Context: a (potentially empty) history accompanied by auxiliary information
 (s/def :rebecca.context/agent string?)
 (s/def :rebecca.context/preamble string?)

@@ -1,14 +1,23 @@
 (ns rebecca.context
-  (:require [rebecca.history :refer [h-concat history h-conj
-                                     default-token-estimator
-                                     default-token-limit
-                                     default-trim-factor]])
+  (:require [clojure.string :as cstr]
+            [clojure.math :refer [round]]
+            [clojure.spec.alpha :as s]
+            [rebecca.history :refer [h-concat h-conj]])
   (:import java.time.Instant
            java.time.temporal.ChronoUnit))
 
 (def default-speaker "Other")
 
 (def default-agent "Rebecca")
+
+(def default-token-estimator (fn [seg-text]
+                               (round
+                                (* 4/3
+                                   (count (cstr/split seg-text #"\s+"))))))
+
+(def default-token-limit 2048)
+
+(def default-trim-factor 3/4)
 
 (defn make-prompt
   ([speaker] (make-prompt speaker (Instant/now)))
@@ -36,6 +45,37 @@
        :trim-factor trim-fact     ; Proportion of context to keep after trimming
        :tokens-estimator testim   ; Number-of-tokens estimator
        :pre-toks pre-toks})))     ; Length of the introductory text
+
+(defn h-trim
+  [h]
+  {:pre [(s/valid? :rebecca/history h)
+         (contains? (meta h) :tokens)
+         (contains? (meta h) :tokens-limit)]
+   :post [(s/valid? :rebecca/history %)
+          (= (dissoc (meta h) :tokens)
+             (dissoc (meta %) :tokens))
+          (let [{:keys [tokens tokens-limit]} (meta %)]
+            (<= tokens tokens-limit))]}
+  (let [{:keys [tokens tokens-limit trim-factor]
+         :or {trim-factor default-trim-factor}} (meta h)
+        {:keys [components]} h]
+    ;; Pop from history until we have recouped enough tokens
+    (loop [cmps components
+           tgoal (- tokens (* tokens-limit trim-factor))
+           recouped 0]
+      (if (< recouped tgoal)
+        (let [ctok (:tokens (meta (peek cmps)))]
+          (recur (pop cmps) tgoal (+ recouped ctok)))
+        ;; Once the goal is reached, recreate history from the shortened queue
+        (vary-meta
+         (let [new-hist (assoc h :components cmps)
+               new-start (:timestamp (peek cmps))]
+           (if (nil? new-start)
+             ;; History is now empty, delete all time references
+             (dissoc new-hist :start-time :end-time)
+             ;; Start time equal to the timestamp of the 1st component
+             (assoc new-hist :start-time new-start)))
+         merge {:tokens (- tokens recouped)})))))
 
 (defn +facts
   [hist facts]

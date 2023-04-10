@@ -8,27 +8,6 @@
                                 [properties :as prop]
                                 [clojure-test :as ct])))
 
-;;; Verify that trimming:
-;;; - reduces the token size beneath the limit
-;;; - produces a history that is a subset of the starting history
-(ct/defspec trimming
-  {:num-tests 100                  ; Arbitrary number of test runs
-   :max-size 50}                   ; Larger sizes may generate integer overflows
-  (prop/for-all [lh (gen/such-that
-                     ;; Construct histories with a token count above the limit
-                     #(let [m (meta %)]
-                        (and (:tokens-limit m)
-                             (> (:tokens m) (:tokens-limit m))))
-                     (s/gen :rebecca/history) 30)] ; Usually 30 tries suffice
-                (let [sh (sut/h-trim lh)]
-                  (and
-                   ;; First property: history has been shortened
-                   (< (:tokens (meta sh)) (:tokens-limit (meta sh)))
-                   ;; Second property: result is a sub-sequence of the original
-                   (= (drop-while #(not= (peek (:components sh)) %)
-                                  (:components lh))
-                      (:components sh))))))
-
 ;;; Verify conjoining of segments unto histories
 (ct/defspec conjoining
   {:num-tests 100
@@ -46,10 +25,6 @@
                    [hist (sort-by :timestamp comps)])]
                 (let [res (apply sut/h-conj hist comps)] ; Sample
                   (and
-                   ;; Token conservation
-                   (= (:tokens (meta res))
-                      (reduce + (:tokens (meta hist))
-                              (map #(:tokens (meta %)) comps)))
                    ;; New elements should have been appended
                    (= (:components res)
                       (concat (:components hist) comps))
@@ -78,8 +53,8 @@
                                    (s/gen :rebecca/component) 70))]
                    ;; Create h2 from such components, so that it is later than h1
                    [h1 (apply sut/h-conj
-                        (sut/history)
-                        (sort-by :timestamp comps))])]
+                              sut/EMPTY
+                              (sort-by :timestamp comps))])]
                 (let [res (sut/h-concat h1 h2)] ; Sample
                   ;; Time ranges either absent or they have been concatenated
                   (or (not (or s1 s2))
@@ -90,7 +65,4 @@
                          (:end-time h2 (:end-time h1))))
                   ;; Components have been concatenated
                   (= (:components res)
-                     (concat (:components h1) (:components h2)))
-                  ;; The token counts have been added together
-                  (= (:tokens (meta res))
-                     (+ (:tokens (meta h1)) (:tokens (meta h2)))))))
+                     (concat (:components h1) (:components h2))))))
