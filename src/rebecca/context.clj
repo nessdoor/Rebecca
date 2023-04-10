@@ -19,8 +19,8 @@
 
 (def default-trim-factor 3/4)
 
-(defn make-prompt
-  ([speaker] (make-prompt speaker (Instant/now)))
+(defn msg-header
+  ([speaker] (msg-header speaker (Instant/now)))
   ([speaker instant]
    (format "[%s|%s]:" speaker (.truncatedTo instant ChronoUnit/SECONDS))))
 
@@ -92,14 +92,14 @@
   [hist input & {ctime :timestamp sp :speaker
                  :or {ctime (Instant/now) sp default-speaker}}]
   (let [isp (.intern sp)                ; Speaker string is highly-repetitive
-        prompt (make-prompt isp ctime)
-        expa (str prompt input)
+        header (msg-header isp ctime)
+        expa (str header input)
         {testim :tokens-estimator
          :or {testim default-token-estimator}} (meta hist)]
     (h-conj hist
             (with-meta {:speaker isp
                         ;; Reuse expansion for representing the input text
-                        :text (subs expa (count prompt))
+                        :text (subs expa (count header))
                         :timestamp ctime}
               {:expansion expa            ; Caching expansion speeds up concat
                :tokens (testim expa)}))))

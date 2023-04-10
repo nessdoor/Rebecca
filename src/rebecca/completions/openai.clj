@@ -1,7 +1,7 @@
 (ns rebecca.completions.openai
   (:require [clojure.string :as cstr]
             [wkok.openai-clojure.api :as oai]
-            [rebecca.context :refer [make-prompt]])
+            [rebecca.context :refer [msg-header]])
   (:import java.time.Instant
            java.time.temporal.ChronoUnit))
 
@@ -11,7 +11,7 @@
   [ctxt & {:as model-params}]
   (let [{agent :agent pre :preamble comp :messages} ctxt
         ctime (Instant/now)
-        footer (make-prompt agent ctime) ; Chat prompt that stimulates response
+        footer (msg-header agent ctime) ; Chat prompt that stimulates response
         result (oai/create-completion
                 (merge
                  default-parameters
@@ -41,7 +41,7 @@
   [agent-name msg]
   (let [{:keys [speaker text timestamp]} msg
         {exp :expansion
-         :or {exp (str (make-prompt speaker timestamp))}} (meta msg)]
+         :or {exp (str (msg-header speaker timestamp))}} (meta msg)]
     (cond
       ;; Every message from the agent is preceded by a system timestamp
       (= agent-name speaker) [(system-time-msg timestamp)
