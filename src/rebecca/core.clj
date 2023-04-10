@@ -1,7 +1,7 @@
 (ns rebecca.core
   (:require [clojure.core.async :as a]
             [clojure.string :as cstr]
-            [rebecca.context :refer [default-agent default-speaker msg-header
+            [rebecca.context :refer [default-agent default-speaker
                                      context +facts +input epsilon-extend]]
             [rebecca.history :refer [h-concat]]
             [rebecca.completions.openai :as roai]

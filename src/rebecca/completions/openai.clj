@@ -1,11 +1,15 @@
 (ns rebecca.completions.openai
   (:require [clojure.string :as cstr]
-            [wkok.openai-clojure.api :as oai]
-            [rebecca.context :refer [msg-header]])
+            [wkok.openai-clojure.api :as oai])
   (:import java.time.Instant
            java.time.temporal.ChronoUnit))
 
 (def default-parameters {:temperature 0})
+
+(defn msg-header
+  ([speaker] (msg-header speaker (Instant/now)))
+  ([speaker instant]
+   (format "[%s|%s]:" speaker (.truncatedTo instant ChronoUnit/SECONDS))))
 
 (defn davinci-3-complete
   [ctxt & {:as model-params}]

@@ -2,7 +2,8 @@
   (:require [clojure.string :as cstr]
             [clojure.math :refer [round]]
             [clojure.spec.alpha :as s]
-            [rebecca.history :refer [h-concat h-conj]])
+            [rebecca.history :refer [h-concat h-conj]]
+            [rebecca.completions.openai :as coa])
   (:import java.time.Instant
            java.time.temporal.ChronoUnit))
 
@@ -18,11 +19,6 @@
 (def default-token-limit 2048)
 
 (def default-trim-factor 3/4)
-
-(defn msg-header
-  ([speaker] (msg-header speaker (Instant/now)))
-  ([speaker instant]
-   (format "[%s|%s]:" speaker (.truncatedTo instant ChronoUnit/SECONDS))))
 
 (defn context
   [text & {:keys [participants agent tlim trim-fact testim]
@@ -92,7 +88,7 @@
   [hist input & {ctime :timestamp sp :speaker
                  :or {ctime (Instant/now) sp default-speaker}}]
   (let [isp (.intern sp)                ; Speaker string is highly-repetitive
-        header (msg-header isp ctime)
+        header (coa/msg-header isp ctime)
         expa (str header input)
         {testim :tokens-estimator
          :or {testim default-token-estimator}} (meta hist)]
