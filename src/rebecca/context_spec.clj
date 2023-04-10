@@ -7,12 +7,12 @@
 ;;; Token count: number of tokens of which a certain text is composed of
 (s/def :rebecca/tokens int?)
 
-;;; Expansion: textual expansion of a component
-(s/def :rebecca.component/expansion string?)
+;;; Expansion: textual expansion of a message
+(s/def :rebecca.message/expansion string?)
 
-;;; Component metadata expected or produced by context manipulation code
-(s/def :rebecca.component/meta (s/keys :req-un [:rebecca/tokens]
-                                       :opt-un [:rebecca.component/expansion]))
+;;; Message metadata expected or produced by context manipulation code
+(s/def :rebecca.message/meta (s/keys :req-un [:rebecca/tokens]
+                                     :opt-un [:rebecca.message/expansion]))
 
 ;;; Token trimming parameters of contexts
 (s/def :rebecca.history/tokens-limit pos-int?)
@@ -35,6 +35,6 @@
                                               :rebecca.context/pre-toks]))
 (s/def :rebecca/context (s/keys :req-un [:rebecca.context/agent
                                          :rebecca.context/preamble]
-                                :opt-un [:rebecca.history/components
+                                :opt-un [:rebecca.history/messages
                                          :rebecca.history/start-time
                                          :rebecca.history/end-time]))

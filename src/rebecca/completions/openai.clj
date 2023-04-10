@@ -9,7 +9,7 @@
 
 (defn davinci-3-complete
   [ctxt & {:as model-params}]
-  (let [{agent :agent pre :preamble comp :components} ctxt
+  (let [{agent :agent pre :preamble comp :messages} ctxt
         ctime (Instant/now)
         footer (make-prompt agent ctime) ; Chat prompt that stimulates response
         result (oai/create-completion
@@ -51,7 +51,7 @@
 
 (defn gpt-35-chat
   [ctxt & {:as model-params}]
-  (let [{agent :agent pre :preamble comp :components} ctxt
+  (let [{agent :agent pre :preamble comp :messages} ctxt
         ctime (Instant/now)
         result (oai/create-chat-completion
                 (merge
@@ -62,7 +62,7 @@
                  {:messages
                   (vec (concat
                         (list {:role "system" :content pre})
-                        ;; Format components into chat messages
+                        ;; Format messages into chat messages
                         (mapcat (fn [m] (to-chat-format agent m)) comp)
                         (list (system-time-msg ctime))))}))
         ;; Concatenate footer with the first completion to obtain final text

@@ -4,16 +4,16 @@
   (:import (java.time DateTimeException Instant)
            java.time.temporal.ChronoUnit))
 
-(defn component
+(defn message
   [text & {:keys [timestamp speaker] :as opts
            :or {timestamp (Instant/now)}}]
-  {:post [(s/valid? :rebecca/component %)]}
+  {:post [(s/valid? :rebecca/message %)]}
   (merge {:text text :timestamp timestamp}
          (if speaker {:speaker speaker})))
 
-(def EMPTY {:components clojure.lang.PersistentQueue/EMPTY})
+(def EMPTY {:messages clojure.lang.PersistentQueue/EMPTY})
 
-(defn h-empty? [h] (empty? (:components h)))
+(defn h-empty? [h] (empty? (:messages h)))
 
 (defn enq-keep-time
   [queue cs last]
@@ -27,18 +27,18 @@
   ([hist] {:post [(identical? hist %)]} hist)
   ([hist & cs]
    {:pre [(s/valid? :rebecca/history hist)
-          (s/valid? (s/* :rebecca/component) cs)
+          (s/valid? (s/* :rebecca/message) cs)
           (let [end (:end-time hist)
                 time (:timestamp (first cs))]
             (or (nil? end) (= end time) (.isBefore end time)))]
     :post [(s/valid? :rebecca/history %)
-           (= (:components %)
-              (concat (:components hist) cs))]}
+           (= (:messages %)
+              (concat (:messages hist) cs))]}
    (merge hist
           (let [[ccs end] (enq-keep-time
-                           (:components hist) cs (:end-time hist))
+                           (:messages hist) cs (:end-time hist))
                 {start :timestamp} (peek ccs)]
-            {:components ccs :start-time start :end-time end}))))
+            {:messages ccs :start-time start :end-time end}))))
 
 (defn h-concat
   ([] nil)
@@ -52,11 +52,11 @@
                 (= lend rbeg)
                 (.isBefore lend rbeg)))]
     :post [(s/valid? :rebecca/history %)
-           (= (:components %)
-              (concat (:components l) (:components r)))]}
+           (= (:messages %)
+              (concat (:messages l) (:messages r)))]}
    ;; Extra keys of rightmost history take precedence
    (merge l r
-          {:components (into (:components l) (:components r))}
+          {:messages (into (:messages l) (:messages r))}
           ;; If both histories are empty, the resulting history shall not have a
           ;; time range
           (if (or (:start-time l) (:start-time r))

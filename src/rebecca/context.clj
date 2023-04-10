@@ -58,9 +58,9 @@
             (<= tokens tokens-limit))]}
   (let [{:keys [tokens tokens-limit trim-factor]
          :or {trim-factor default-trim-factor}} (meta h)
-        {:keys [components]} h]
+        {:keys [messages]} h]
     ;; Pop from history until we have recouped enough tokens
-    (loop [cmps components
+    (loop [cmps messages
            tgoal (- tokens (* tokens-limit trim-factor))
            recouped 0]
       (if (< recouped tgoal)
@@ -68,12 +68,12 @@
           (recur (pop cmps) tgoal (+ recouped ctok)))
         ;; Once the goal is reached, recreate history from the shortened queue
         (vary-meta
-         (let [new-hist (assoc h :components cmps)
+         (let [new-hist (assoc h :messages cmps)
                new-start (:timestamp (peek cmps))]
            (if (nil? new-start)
              ;; History is now empty, delete all time references
              (dissoc new-hist :start-time :end-time)
-             ;; Start time equal to the timestamp of the 1st component
+             ;; Start time equal to the timestamp of the 1st message
              (assoc new-hist :start-time new-start)))
          merge {:tokens (- tokens recouped)})))))
 

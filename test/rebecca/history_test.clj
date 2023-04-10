@@ -14,25 +14,25 @@
    :max-size 50}
   (prop/for-all [[hist comps]
                  (gen/let [{end :end-time :as hist} (s/gen :rebecca/history)
-                           ;; Generate components that are newer than history
+                           ;; Generate messages that are newer than history
                            comps (gen/list
                                   (gen/such-that
                                    #(let [{ts :timestamp} %]
                                       (or (nil? end)
                                           (= end ts) (.isBefore end ts)))
-                                   (s/gen :rebecca/component) 50))]
-                   ;; Make sure that the list of components is sorted
+                                   (s/gen :rebecca/message) 50))]
+                   ;; Make sure that the list of messages is sorted
                    [hist (sort-by :timestamp comps)])]
                 (let [res (apply sut/h-conj hist comps)] ; Sample
                   (and
                    ;; New elements should have been appended
-                   (= (:components res)
-                      (concat (:components hist) comps))
+                   (= (:messages res)
+                      (concat (:messages hist) comps))
                    ;; Start time must be left unchanged, if it existed,
-                   ;; otherwise is that of the first component
+                   ;; otherwise is that of the first message
                    (= (:start-time res)
                       (:start-time hist (:timestamp (first comps))))
-                   ;; End time is that of the last appended component, if any
+                   ;; End time is that of the last appended message, if any
                    (= (:end-time res)
                       (:timestamp (last comps) (:end-time hist)))))))
 
@@ -43,15 +43,15 @@
   (prop/for-all [[{s1 :start-time e1 :end-time :as h1}
                   {s2 :start-time e2 :end-time :as h2}]
                  (gen/let [{end :end-time :as h1} (s/gen :rebecca/history)
-                           ;; Generate only components that are later than h1
+                           ;; Generate only messages that are later than h1
                            comps (gen/list
                                   (gen/such-that
                                    #(let [{ts :timestamp} %]
                                       (or (nil? end)
                                           (= end ts)
                                           (.isBefore end ts)))
-                                   (s/gen :rebecca/component) 70))]
-                   ;; Create h2 from such components, so that it is later than h1
+                                   (s/gen :rebecca/message) 70))]
+                   ;; Create h2 from such messages, so that it is later than h1
                    [h1 (apply sut/h-conj
                               sut/EMPTY
                               (sort-by :timestamp comps))])]
@@ -63,6 +63,6 @@
                   (or (not (or e1 e2))
                       (= (:end-time res)
                          (:end-time h2 (:end-time h1))))
-                  ;; Components have been concatenated
-                  (= (:components res)
-                     (concat (:components h1) (:components h2))))))
+                  ;; Messages have been concatenated
+                  (= (:messages res)
+                     (concat (:messages h1) (:messages h2))))))

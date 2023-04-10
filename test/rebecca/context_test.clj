@@ -9,14 +9,14 @@
                                 [properties :as prop]
                                 [clojure-test :as ct])))
 
-;;; Generator of components with metadata
-(def component-gen (gen/let [component (s/gen :rebecca/component)
-                             cmeta (s/gen :rebecca.component/meta)]
-                     (with-meta component cmeta)))
+;;; Generator of messages with metadata
+(def message-gen (gen/let [message (s/gen :rebecca/message)
+                           cmeta (s/gen :rebecca.message/meta)]
+                     (with-meta message cmeta)))
 
 ;;; Generator of histories with consistent token metadata
 (def history-gen (gen/let [comps (gen/fmap #(sort-by :timestamp %)
-                                           (gen/list component-gen))
+                                           (gen/list message-gen))
                            ;; This contains limits, estimators and trim factors
                            hmeta (s/gen :rebecca.history/meta)]
                    (with-meta (hs/history
@@ -41,6 +41,6 @@
                    ;; First property: history has been shortened
                    (< (:tokens (meta sh)) (:tokens-limit (meta sh)))
                    ;; Second property: result is a sub-sequence of the original
-                   (= (drop-while #(not= (peek (:components sh)) %)
-                                  (:components lh))
-                      (:components sh))))))
+                   (= (drop-while #(not= (peek (:messages sh)) %)
+                                  (:messages lh))
+                      (:messages sh))))))

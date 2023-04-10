@@ -3,10 +3,10 @@
             [clojure.spec.gen.alpha :as gen])
   (:import java.time.Instant))
 
-;;; Component: a textual piece of information said by someone
-(s/def :rebecca.component/speaker string?)
-(s/def :rebecca.component/text string?)
-(s/def :rebecca.component/timestamp (s/with-gen inst?
+;;; Message: a textual piece of information said by someone
+(s/def :rebecca.message/speaker string?)
+(s/def :rebecca.message/text string?)
+(s/def :rebecca.message/timestamp (s/with-gen inst?
                                       #(gen/fmap
                                         (fn [s] (Instant/ofEpochSecond s))
                                         (gen/such-that
@@ -15,9 +15,9 @@
                                                s
                                                (.getEpochSecond (Instant/MAX))))
                                          (s/gen int?)))))
-(s/def :rebecca/component (s/keys :req-un [:rebecca.component/text
-                                           :rebecca.component/timestamp]
-                                  :opt-un [:rebecca.component/speaker]))
+(s/def :rebecca/message (s/keys :req-un [:rebecca.message/text
+                                         :rebecca.message/timestamp]
+                                :opt-un [:rebecca.message/speaker]))
 
 ;;; Verify whether the given object is a Clojure persistent queue
 (def persistent-queue? #(instance? clojure.lang.PersistentQueue %))
@@ -29,7 +29,7 @@
 ;;; Generate persistent queues of chronologically-ordered segments
 (defn squeue-gen [] (pqueue (gen/fmap #(sort-by :timestamp %)
                                       (gen/list
-                                       (s/gen :rebecca/component)))))
+                                       (s/gen :rebecca/message)))))
 
 (defn chrono-ordered?
   ([] true)
@@ -43,10 +43,10 @@
            false))
        true))))
 
-;;; History: a succession of components
-(s/def :rebecca.history/components (s/with-gen
+;;; History: a succession of messages
+(s/def :rebecca.history/messages (s/with-gen
                                      (s/and
-                                      (s/coll-of :rebecca/component
+                                      (s/coll-of :rebecca/message
                                                  :kind persistent-queue?)
                                       #(chrono-ordered? %))
                                      squeue-gen))
@@ -54,22 +54,22 @@
 (s/def :rebecca.history/end-time inst?)
 
 ;;; (Generate a conforming history object)
-(defn history [q] (merge {:components q}
+(defn history [q] (merge {:messages q}
                          (if (seq q)
                            {:start-time (:timestamp (peek q))
                             :end-time (:timestamp (last q))})))
 
-;;; (Verify consistency of :start-time and :end-time w.r.t. components)
+;;; (Verify consistency of :start-time and :end-time w.r.t. messages)
 (defn verify-hist-end-start [h]
-  (let [{:keys [components start-time end-time]} h]
-    (and (= start-time (:timestamp (peek components)))
-         (= end-time (:timestamp (last components))))))
+  (let [{:keys [messages start-time end-time]} h]
+    (and (= start-time (:timestamp (peek messages)))
+         (= end-time (:timestamp (last messages))))))
 
 (s/def :rebecca/history (s/and
-                         (s/keys :req-un [:rebecca.history/components]
+                         (s/keys :req-un [:rebecca.history/messages]
                                  :opt-un [:rebecca.history/start-time
                                           :rebecca.history/end-time]
                                  :gen #(gen/fmap
                                         history
-                                        (s/gen :rebecca.history/components)))
+                                        (s/gen :rebecca.history/messages)))
                          verify-hist-end-start))
