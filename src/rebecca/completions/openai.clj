@@ -1,21 +1,17 @@
 (ns rebecca.completions.openai
   (:require [clojure.string :as cstr]
-            [wkok.openai-clojure.api :as oai])
+            [wkok.openai-clojure.api :as oai]
+            [rebecca.completions.common :as cc])
   (:import java.time.Instant
            java.time.temporal.ChronoUnit))
 
 (def default-parameters {:temperature 0})
 
-(defn msg-header
-  ([speaker] (msg-header speaker (Instant/now)))
-  ([speaker instant]
-   (format "[%s|%s]:" speaker (.truncatedTo instant ChronoUnit/SECONDS))))
-
 (defn davinci-3-complete
   [ctxt & {:as model-params}]
   (let [{agent :agent pre :preamble comp :messages} ctxt
         ctime (Instant/now)
-        footer (msg-header agent ctime) ; Chat prompt that stimulates response
+        footer (cc/msg-header agent ctime) ; Chat prompt that stimulates response
         result (oai/create-completion
                 (merge
                  default-parameters
@@ -45,7 +41,7 @@
   [agent-name msg]
   (let [{:keys [speaker text timestamp]} msg
         {exp :expansion
-         :or {exp (str (msg-header speaker timestamp))}} (meta msg)]
+         :or {exp (str (cc/msg-header speaker timestamp))}} (meta msg)]
     (cond
       ;; Every message from the agent is preceded by a system timestamp
       (= agent-name speaker) [(system-time-msg timestamp)
