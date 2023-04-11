@@ -14,7 +14,8 @@
         (str text
              "\nWhat follows is a conversation between "
              agent " and " participants ".")]
-    {:agent agent :preamble preamble}))
+    (merge rebecca.history/EMPTY
+           {:agent agent :preamble preamble})))
 
 (defn +facts
   [hist facts]
