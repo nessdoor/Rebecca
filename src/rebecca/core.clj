@@ -92,6 +92,7 @@ In addition, she can only see messages sent directly to her."
   (do
     (Thread/sleep 5000)
     (let [[new-read new-ctxt] (@payload last-read ctxt)]
+      (set-context new-ctxt)
       (recur new-read new-ctxt))))
 
 (defn main [] (a/thread (polling-loop -1 @saved-context)))
