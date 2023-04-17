@@ -1,14 +1,11 @@
 (ns rebecca.completions.common
   (:require [clojure.string :as cstr]
-            [clojure.math :refer [round]]
             [clojure.spec.alpha :as s])
   (:import java.time.Instant
            java.time.temporal.ChronoUnit))
 
 (def default-token-estimator (fn [seg-text]
-                               (round
-                                (* 4/3
-                                   (count (cstr/split seg-text #"\s+"))))))
+                               (* 3 (count (cstr/split seg-text #"\s+")))))
 
 (def default-token-limit 2048)
 
