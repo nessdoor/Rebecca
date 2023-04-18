@@ -1,6 +1,7 @@
 (ns rebecca.completions.common-test
   (:require [rebecca.completions.common :as sut]
             [rebecca.history-spec :as hs]
+            [rebecca.seq :refer [queue]]
             [clojure.spec.alpha :as s]
             [clojure.test :as t]
             [clojure.test.check :as tc]
@@ -46,7 +47,7 @@
                            ;; This contains limits, estimators and trim factors
                            hmeta (s/gen :rebecca.history/meta)]
                    (with-meta (hs/history
-                               (into clojure.lang.PersistentQueue/EMPTY comps))
+                               (into (queue) comps))
                      (assoc hmeta :tokens
                             (reduce + (map #(:tokens (meta %)) comps))))))
 

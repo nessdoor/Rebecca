@@ -1,5 +1,6 @@
 (ns rebecca.history
   (:require [clojure.spec.alpha :as s]
+            [rebecca.seq :refer [queue]]
             [rebecca.history-spec])
   (:import (java.time DateTimeException Instant)
            java.time.temporal.ChronoUnit))
@@ -11,7 +12,7 @@
   (merge {:text text :timestamp timestamp}
          (if speaker {:speaker speaker})))
 
-(def EMPTY {:messages clojure.lang.PersistentQueue/EMPTY})
+(def EMPTY {:messages (queue)})
 
 (defn h-empty? [h] (empty? (:messages h)))
 

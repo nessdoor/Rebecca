@@ -1,6 +1,7 @@
 (ns rebecca.history-spec
   (:require [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as gen])
+            [clojure.spec.gen.alpha :as gen]
+            [rebecca.seq :refer [queue]])
   (:import java.time.Instant))
 
 ;;; Message: a textual piece of information said by someone
@@ -23,7 +24,7 @@
 (def persistent-queue? #(instance? clojure.lang.PersistentQueue %))
 
 ;;; Persistent queue generator for property-based testing
-(defn pqueue [generator] (gen/fmap #(into clojure.lang.PersistentQueue/EMPTY %)
+(defn pqueue [generator] (gen/fmap #(into (queue) %)
                                    generator))
 
 ;;; Generate persistent queues of chronologically-ordered segments
