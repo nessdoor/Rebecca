@@ -32,6 +32,5 @@
 
 (defn epsilon-extend
   [ctxt compl-backend & {:as model-params}]
-  (let [answer (compl-backend ctxt model-params)] ; Answer from the API
-    ;; First return value is the completion, while second is the extended context
-    [answer (h-conj ctxt answer)]))
+  ;; First return value is the completion, while second is the extended context
+  (compl-backend ctxt model-params))

@@ -11,6 +11,37 @@
 
 (def default-trim-factor 3/4)
 
+(defn trimming-plan
+  ([tokens limit] (trimming-plan tokens limit default-trim-factor))
+  ([tokens limit trim-factor]
+   (let [total (reduce + tokens)
+         goal (- total (* limit trim-factor))]
+     (loop [recouped 0, leap 0, residue tokens]
+       (if (< recouped goal)
+         (recur (+ recouped (first residue))
+                (inc leap)
+                (rest residue))
+         [leap (- total recouped) residue])))))
+
+(defn qdrop
+  [n q]
+  (if (< 0 n)
+    (recur (dec n) (pop q))
+    q))
+
+(defn trim-context
+  ([ctxt tokens limit] (trim-context ctxt tokens limit default-trim-factor))
+  ([ctxt tokens limit trim-factor]
+   (let [{msgs :messages} ctxt
+         [leap trimmed-size short-tok-list] (trimming-plan tokens limit)
+         ;; TODO implement shortening function in history namespace
+         short-queue (qdrop leap msgs)]
+     (vary-meta
+      (merge ctxt
+             {:messages short-queue
+              :start-time (:timestamp (peek short-queue))})
+      assoc :tokens trimmed-size))))
+
 (defn msg-header
   ([speaker] (msg-header speaker (Instant/now)))
   ([speaker instant]

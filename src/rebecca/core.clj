@@ -30,7 +30,7 @@
               (-> c
                   (+input msg-text :timestamp (Instant/ofEpochSecond ctime)
                           :speaker speaker)
-                  (epsilon-extend roai/gpt-35-chat
+                  (epsilon-extend #(roai/gen-reply %1 roai/gpt-35-chat %2)
                                   :temperature 0.8 :max_tokens 1024)
                   (send-reply chat-id message-id))))
           ctxt
