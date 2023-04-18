@@ -1,6 +1,6 @@
 (ns rebecca.history
   (:require [clojure.spec.alpha :as s]
-            [rebecca.seq :refer [queue]]
+            [rebecca.seq :refer [queue pop-drop]]
             [rebecca.history-spec])
   (:import (java.time DateTimeException Instant)
            java.time.temporal.ChronoUnit))
@@ -40,6 +40,15 @@
                            (:messages hist) cs (:end-time hist))
                 {start :timestamp} (peek ccs)]
             {:messages ccs :start-time start :end-time end}))))
+
+(defn h-drop
+  [n hist]
+  (let [new-queue (pop-drop n (:messages hist))
+        {new-start :timestamp} (peek new-queue)]
+    (merge hist
+           {:messages new-queue}
+           (if new-start
+             {:start-time new-start}))))
 
 (defn h-concat
   ([] nil)

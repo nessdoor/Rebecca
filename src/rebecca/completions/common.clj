@@ -1,7 +1,7 @@
 (ns rebecca.completions.common
   (:require [clojure.string :as cstr]
             [clojure.spec.alpha :as s]
-            [rebecca.seq :refer [pop-drop]])
+            [rebecca.history :as h])
   (:import java.time.Instant
            java.time.temporal.ChronoUnit))
 
@@ -27,15 +27,9 @@
 (defn trim-context
   ([ctxt tokens limit] (trim-context ctxt tokens limit default-trim-factor))
   ([ctxt tokens limit trim-factor]
-   (let [{msgs :messages} ctxt
-         [leap trimmed-size short-tok-list] (trimming-plan tokens limit)
-         ;; TODO implement shortening function in history namespace
-         short-queue (pop-drop leap msgs)]
-     (vary-meta
-      (merge ctxt
-             {:messages short-queue
-              :start-time (:timestamp (peek short-queue))})
-      assoc :tokens trimmed-size))))
+   (let [[leap trimmed-size short-tok-list] (trimming-plan tokens limit)]
+     (vary-meta (h/h-drop leap ctxt)
+                assoc :tokens trimmed-size))))
 
 (defn msg-header
   ([speaker] (msg-header speaker (Instant/now)))
