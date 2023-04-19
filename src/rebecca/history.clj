@@ -44,11 +44,14 @@
 (defn h-drop
   [n hist]
   (let [new-queue (pop-drop n (:messages hist))
-        {new-start :timestamp} (peek new-queue)]
-    (merge hist
-           {:messages new-queue}
-           (if new-start
-             {:start-time new-start}))))
+        {new-start :timestamp} (peek new-queue)
+        short-hist (assoc hist :messages new-queue)]
+    ;; If history is empty, remove time range
+    (if (h-empty? short-hist)
+      (-> short-hist
+          (dissoc :start-time)
+          (dissoc :end-time))
+      (assoc short-hist :start-time new-start))))
 
 (defn h-concat
   ([] nil)
