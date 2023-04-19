@@ -12,24 +12,25 @@
 
 (def default-trim-factor 3/4)
 
-(defn trimming-plan
-  ([tokens limit] (trimming-plan tokens limit default-trim-factor))
-  ([tokens limit trim-factor]
-   (let [total (reduce + tokens)
-         goal (- total (* limit trim-factor))]
-     (loop [recouped 0, leap 0, residue tokens]
-       (if (< recouped goal)
-         (recur (+ recouped (first residue))
-                (inc leap)
-                (rest residue))
-         [leap (- total recouped) residue])))))
+(defn- trimming-plan
+  [tokens limit trim-factor]
+  (let [total (reduce + tokens)
+        goal (- total (* limit trim-factor))]
+    (loop [recouped 0, leap 0, residue tokens]
+      (if (< recouped goal)
+        (recur (+ recouped (first residue))
+               (inc leap)
+               (rest residue))
+        [leap (- total recouped) residue]))))
 
 (defn trim-context
-  ([ctxt tokens limit] (trim-context ctxt tokens limit default-trim-factor))
+  ([ctxt tokens limit]
+   (trim-context ctxt tokens limit default-trim-factor))
   ([ctxt tokens limit trim-factor]
-   (let [[leap trimmed-size short-tok-list] (trimming-plan tokens limit)]
-     (vary-meta (h/h-drop leap ctxt)
-                assoc :tokens trimmed-size))))
+   (let [[leap final-size _] (trimming-plan tokens limit trim-factor)]
+     (vary-meta
+      (h/h-drop leap ctxt)
+      assoc :tokens final-size))))
 
 (defn msg-header
   ([speaker] (msg-header speaker (Instant/now)))
