@@ -9,41 +9,49 @@
 
 (def default-parameters {:temperature 0})
 
+(defn- get-error
+  [e]
+  (:error
+   (chc/parse-string (:body (ex-data e))
+                     true)))
+
+(defn- length-exceeded?
+  [e]
+  (let [{:keys [type code]} (get-error e)]
+    (and type code
+         (= type "invalid_request_error")
+         (= code "context_length_exceeded"))))
+
 (defn gen-reply
   [ctxt backend & {:as model-params}]
   (let [{agent-name :agent msgs :messages} ctxt
-        tokens (:tokens (meta ctxt)      ; Equivalent tokens of the context
-                        (count msgs))    ; (At least 1 token per message)
-        fmt ((:formatter backend) ctxt)  ; Formatted text messages
-        msgs-tokens                      ; Tokens of each message
+        tokens (:tokens (meta ctxt)     ; Equivalent tokens of the context
+                        (count msgs))   ; (At least 1 token per message)
+        fmt ((:formatter backend) ctxt) ; Formatted text messages
+        msgs-tokens                     ; Tokens of each message
         ((:tokenizer backend) fmt)
         {:keys [token-limit]} backend]
     (if (> tokens token-limit)
-      ;; Trim context if we know that it is too long
+      ;; Trim context if we already know that it is too long
       (recur (cc/trim-context ctxt msgs-tokens token-limit)
              backend model-params)
-      ;; Else, try to generate a reply
+      ;; Else, try generating a reply
       (try
-        (let [{:keys [reply response]}    ; Reply message and API response
+        (let [{:keys [reply response]}  ; Reply message and API response
               ((:generator backend) agent-name fmt)
-              {ptoks :prompt_tokens       ; Token count of reply and context
-               total :total_tokens} (:usage response)
-              sized-reply (vary-meta reply assoc :tokens ptoks)]
-          [sized-reply
+              {total :total_tokens}     ; Token count of the resulting context
+              (:usage response)]
+          [reply
            (vary-meta
-            (rh/h-conj ctxt sized-reply)
-            ;; Remember the total token count of the entire context
+            (rh/h-conj ctxt reply)
+            ;; Remember the total token count for future overflow tests
             assoc :tokens total)])
         (catch Exception e
-          (let [{{:keys [type code]} :error} (chc/parse-string (:body (ex-data e)) true)]
-            (if (and type code
-                     (= type "invalid_request_error")
-                     (= code "context_length_exceeded"))
-              ;; Completion failed because context overflowed, trim and retry
-              (gen-reply (cc/trim-context ctxt msgs-tokens token-limit)
-                         backend model-params)
-              ;; Else, re-throw
-              (throw e))))))))
+          (if (length-exceeded? e)      ; Did we receive an overflow error?
+            (gen-reply
+             (cc/trim-context ctxt msgs-tokens token-limit) ; Trim and retry
+             backend model-params)
+            (throw e)))))))             ; Re-throw any other error
 
 (defn davinci-3-format
   [& {pre :preamble msgs :messages}]
