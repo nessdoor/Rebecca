@@ -6,17 +6,30 @@
            java.time.temporal.ChronoUnit))
 
 (defn message
+  "Creates a message containing the given text. Optionally, a message
+  timestamp and a string identifying the speaker (i.e. who sent the
+  message) can be provided. By default, the message will carry a
+  timestamp corresponding to the instant when it was created, and will
+  specify no speaker."
   [text & {:keys [timestamp speaker] :as opts
            :or {timestamp (Instant/now)}}]
   {:post [(s/valid? :rebecca/message %)]}
   (merge {:text text :timestamp timestamp}
          (if speaker {:speaker speaker})))
 
-(def EMPTY {:messages (queue)})
+(def EMPTY
+  "The empty history, containing an empty message queue and no time
+  range indication."
+  {:messages (queue)})
 
-(defn h-empty? [h] (empty? (:messages h)))
+(defn h-empty?
+  "Returns true when the given history is empty."
+  [h] (empty? (:messages h)))
 
-(defn enq-keep-time
+(defn- enq-keep-time
+  "Accumulates a sequence of messages onto a queue, keeping track of the
+  timestamp of the newest message, so that a single scan is necessary
+  to construct a new history. Internal use only."
   [queue cs last]
   (if (seq cs)
     (let [fc (first cs)]
@@ -24,6 +37,11 @@
     [queue last]))
 
 (defn h-conj
+  "With no arguments, returns an empty history. With hist only, returns
+  the same hist unaltered. With hist and one or more messages (cs),
+  returns a history with the given messages appended to its
+  end. Messages must be chronologically ordered and simultaneous or
+  newer than the newest message on the queue."
   ([] EMPTY)
   ([hist] {:post [(identical? hist %)]} hist)
   ([hist & cs]
@@ -42,6 +60,8 @@
             {:messages ccs :start-time start :end-time end}))))
 
 (defn h-drop
+  "Drops the oldest n messages. If hist is empty or shorter than n,
+  returns an empty history."
   [n hist]
   (let [new-queue (pop-drop n (:messages hist))
         {new-start :timestamp} (peek new-queue)
@@ -54,6 +74,10 @@
       (assoc short-hist :start-time new-start))))
 
 (defn h-concat
+  "Concatenates two or more histories together, from left to
+  right. Concatenated histories must be chronologically ordered.  With
+  no arguments, returns nil. With one argument, returns the argument
+  unchanged."
   ([] nil)
   ([l] {:post [(identical? l %)]} l)
   ([l r]
