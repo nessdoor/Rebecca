@@ -6,7 +6,8 @@
             [clojure.test.check :as tc]
             (clojure.test.check [generators :as gen]
                                 [properties :as prop]
-                                [clojure-test :as ct])))
+                                [clojure-test :as ct])
+            [java-time.api :as jt]))
 
 ;;; Verify conjoining of segments unto histories
 (ct/defspec conjoining
@@ -19,8 +20,9 @@
                                   (gen/such-that
                                    #(let [{ts :timestamp} %]
                                       (or (nil? end)
-                                          (= end ts) (.isBefore end ts)))
-                                   (s/gen :rebecca/message) 50))]
+                                          (jt/not-after? (jt/instant end)
+                                                         (jt/instant ts))))
+                                   (s/gen :rebecca/message) 60))]
                    ;; Make sure that the list of messages is sorted
                    [hist (sort-by :timestamp comps)])]
                 (let [res (apply sut/h-conj hist comps)] ; Sample
@@ -48,9 +50,9 @@
                                   (gen/such-that
                                    #(let [{ts :timestamp} %]
                                       (or (nil? end)
-                                          (= end ts)
-                                          (.isBefore end ts)))
-                                   (s/gen :rebecca/message) 70))]
+                                          (jt/not-after? (jt/instant end)
+                                                         (jt/instant ts))))
+                                   (s/gen :rebecca/message) 60))]
                    ;; Create h2 from such messages, so that it is later than h1
                    [h1 (apply sut/h-conj
                               sut/EMPTY

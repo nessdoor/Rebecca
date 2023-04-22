@@ -1,55 +1,35 @@
 (ns rebecca.history-spec
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
-            [rebecca.seq :refer [queue]])
+            [java-time.api :as jt]
+            [rebecca.seq :refer [queue queue?]])
   (:import java.time.Instant))
 
 ;;; Message: a textual piece of information said by someone
 (s/def :rebecca.message/speaker string?)
 (s/def :rebecca.message/text string?)
-(s/def :rebecca.message/timestamp (s/with-gen inst?
-                                      #(gen/fmap
-                                        (fn [s] (Instant/ofEpochSecond s))
-                                        (gen/such-that
-                                         (fn [s]
-                                           (<= (.getEpochSecond (Instant/MIN))
-                                               s
-                                               (.getEpochSecond (Instant/MAX))))
-                                         (s/gen int?)))))
+(s/def :rebecca.message/timestamp inst?)
 (s/def :rebecca/message (s/keys :req-un [:rebecca.message/text
                                          :rebecca.message/timestamp]
                                 :opt-un [:rebecca.message/speaker]))
 
-;;; Verify whether the given object is a Clojure persistent queue
-(def persistent-queue? #(instance? clojure.lang.PersistentQueue %))
-
 ;;; Persistent queue generator for property-based testing
-(defn pqueue [generator] (gen/fmap #(into (queue) %)
-                                   generator))
+(defn pqueue [generator] (gen/fmap #(into (queue) %) generator))
 
 ;;; Generate persistent queues of chronologically-ordered segments
 (defn squeue-gen [] (pqueue (gen/fmap #(sort-by :timestamp %)
                                       (gen/list
                                        (s/gen :rebecca/message)))))
 
-(defn chrono-ordered?
-  ([] true)
-  ([coll]
-   (loop [prec (Instant/MIN), rst coll]
-     (if (seq rst)
-       (let [{succ :timestamp} (first rst)]
-         (if (or (= prec succ)
-                 (.isBefore prec succ))
-           (recur succ (next rst))
-           false))
-       true))))
-
 ;;; History: a succession of messages
 (s/def :rebecca.history/messages (s/with-gen
                                      (s/and
-                                      (s/coll-of :rebecca/message
-                                                 :kind persistent-queue?)
-                                      #(chrono-ordered? %))
+                                      (s/coll-of :rebecca/message :kind queue?)
+                                      #(if (> (count %) 1)
+                                         (apply jt/not-after?
+                                                (map jt/instant
+                                                     (map :timestamp %)))
+                                         true))
                                      squeue-gen))
 (s/def :rebecca.history/start-time inst?)
 (s/def :rebecca.history/end-time inst?)
