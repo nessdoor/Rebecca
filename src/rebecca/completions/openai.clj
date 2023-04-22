@@ -35,22 +35,20 @@
       (recur (cc/trim-context ctxt msgs-tokens token-limit)
              backend model-params)
       ;; Else, try generating a reply
-      (try
-        (let [{:keys [reply response]}  ; Reply message and API response
-              ((:generator backend) agent-name fmt)
-              {total :total_tokens}     ; Token count of the resulting context
-              (:usage response)]
+      (let [{:keys [reply response error]} ; Reply message, API response and possible error
+            ((:generator backend) agent-name fmt)]
+        (if error                       ; If we received an error...
+          (if (length-exceeded? error)  ; ... and it is an overflow exception...
+            (recur (cc/trim-context     ; ... trim history and retry
+                    ctxt msgs-tokens token-limit)
+                   backend model-params)
+            (throw error))              ; Re-throw any other exception
+          ;; If no error happened, return reply message and extended context
           [reply
            (vary-meta
             (rh/h-conj ctxt reply)
-            ;; Remember the total token count for future overflow tests
-            assoc :tokens total)])
-        (catch Exception e
-          (if (length-exceeded? e)      ; Did we receive an overflow error?
-            (gen-reply
-             (cc/trim-context ctxt msgs-tokens token-limit) ; Trim and retry
-             backend model-params)
-            (throw e)))))))             ; Re-throw any other error
+            ;; Remember token count of resulting context for future overflow tests
+            assoc :tokens (get-in response [:usage :total_tokens]))])))))
 
 (defn davinci-3-format
   [& {pre :preamble msgs :messages}]
@@ -63,22 +61,21 @@
 
 (defn davinci-3-complete
   [agent-name messages & {:as model-params}]
-  (let [ctime (jt/instant)
-        header (cc/msg-header agent-name ctime) ; Stimulates response from model
-        response (oai/create-completion
-                  (merge
-                   default-parameters
-                   model-params     ; User-supplied parameters
-                   {:model "text-davinci-003"
-                    :prompt (cstr/join messages
-                                       (list header))}))]
-    (if true                        ; TODO completion valid?
-      (println response)
+  (try                                 ; Completion may fail for various reasons
+    (let [ctime (jt/instant)
+          header (cc/msg-header agent-name ctime) ; Stimulates response from model
+          response (oai/create-completion
+                    (merge
+                     default-parameters
+                     model-params     ; User-supplied parameters
+                     {:model "text-davinci-003"
+                      :prompt (cstr/join messages
+                                         (list header))}))]
       ;; Return reply message and full API response
-      ;; TODO signal failure
       {:reply (rh/message (:text (first (:choices response)))
                           :speaker agent-name :timestamp ctime)
-       :response response})))
+       :response response})
+    (catch Exception e {:error e})))    ; Upon failure, return the exception
 
 (def davinci-3
   {:formatter davinci-3-format
@@ -108,30 +105,32 @@
 
 (defn gpt-35-chat-complete
   [agent-name messages & {:as model-params}]
-  (let [ctime (jt/instant)
-        response (oai/create-chat-completion
-                (merge
-                 default-parameters
-                 model-params
-                 {:model "gpt-3.5-turbo"
-                 ;; Prompt is the concatenation of primer, history and footer
-                  :messages
-                  (vec (concat messages
-                               (list (system-time-msg ctime))))}))]
-    (if true                            ; TODO completion valid?
-      (do
-        (println response)
-        (let [completion (:content (:message (first (:choices response))))
-              ;; The model could have tried to emulate the message header
-              header-match (re-find
-                            (re-pattern (str "^\\[" agent-name "\\|.*\\]:"))
-                            completion)]
-          {:reply
-           (rh/message (if header-match ; We cannot trust the model's output
-                         (subs completion (count header-match)) ; Exclude header
-                         completion)
-                       :speaker agent-name :timestamp ctime)
-           :response response})))))
+  (try                                 ; Completion may fail for various reasons
+    (let [ctime (jt/instant)           ; Timestamp of the response message
+          response                     ; API response object
+          (oai/create-chat-completion
+           (merge default-parameters
+                  model-params
+                  {:model "gpt-3.5-turbo"
+                   ;; Prompt is the concatenation of history and system time msg
+                   :messages
+                   (vec (concat messages
+                                (list (system-time-msg ctime))))}))
+          ;; Reply message
+          completion (:content (:message (first (:choices response))))
+          ;; The model could have tried to emulate the message header, and we
+          ;; will have to remove it, if it did. Create a loose regexp matcher
+          ;; for it, and then attempt a match.
+          header-match (re-find
+                        (re-pattern (str "^\\[" agent-name "\\|.*\\]:"))
+                        completion)]
+      ;; Return reply message and full API response
+      {:reply
+       (rh/message (if header-match     ; Remove the unwanted header, if present
+                     (subs completion (count header-match))
+                     completion) :speaker agent-name :timestamp ctime)
+       :response response})
+    (catch Exception e {:error e})))    ; Upon failure, return the exception
 
 (def gpt-35-chat
   {:formatter gpt-35-chat-format
