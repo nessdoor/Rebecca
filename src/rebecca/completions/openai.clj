@@ -74,16 +74,11 @@
                                        (list header))}))]
     (if true                        ; TODO completion valid?
       (println response)
-      (let [completion             ; Header + completion = response message text
-            (str header (:text (first (:choices response))))
-            reply (vary-meta            ; Response message w/ cached format
-                   {:speaker agent-name
-                    :text (subs completion (count header))
-                    :timestamp ctime}
-                   assoc :formatted completion)]
-        ;; Return formatted reply message and full API response
-        ;; TODO signal failure
-        {:reply reply :response response}))))
+      ;; Return reply message and full API response
+      ;; TODO signal failure
+      {:reply (rh/message (:text (first (:choices response)))
+                          :speaker agent-name :timestamp ctime)
+       :response response})))
 
 (def davinci-3
   {:formatter davinci-3-format
@@ -127,7 +122,7 @@
       (do
         (println response)
         (let [completion (:content (:message (first (:choices response))))
-              ;; Due to the formatting, the model could generate an unwanted header
+              ;; The model could have tried to emulate the message header
               header-match (re-find
                             (re-pattern (str "^\\[" agent-name "\\|.*\\]:"))
                             completion)]
