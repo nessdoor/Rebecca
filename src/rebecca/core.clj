@@ -10,6 +10,10 @@
 
 (def bot (tbot/create))
 
+(def whitelist (set
+                (map parse-long
+                     (cstr/split (System/getenv "TELEGRAM_WHITELIST") #","))))
+
 (defn send-reply
   [[reply ctxt] chat-id message-id]
   (do
@@ -27,12 +31,16 @@
                    {chat-id :id} :chat
                    {speaker :first_name :or {speaker "System"}} :from
                    msg-text :text :or {msg-text ""}} m]
-              (-> c
-                  (+input msg-text :timestamp (Instant/ofEpochSecond ctime)
-                          :speaker speaker)
-                  (epsilon-extend #(roai/gen-reply %1 roai/gpt-35-chat %2)
-                                  :temperature 0.8 :max_tokens 1024)
-                  (send-reply chat-id message-id))))
+              (if (contains? whitelist chat-id) ; Only reply when whitelisted
+                (-> c
+                    (+input msg-text :timestamp (Instant/ofEpochSecond ctime)
+                            :speaker speaker)
+                    (epsilon-extend #(roai/gen-reply %1 roai/gpt-35-chat %2)
+                                    :temperature 0.8 :max_tokens 1024)
+                    (send-reply chat-id message-id))
+                (do
+                  (println (str "DISCARDED:\n" m))  ; Log non-whitelisted msgs
+                  c))))
           ctxt
           (filter (fn [m] (not (or (nil? (:text m))
                                    (< (:date m)

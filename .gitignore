@@ -1,5 +1,6 @@
 .direnv/
 .apikey
+.env
 /target
 /classes
 /checkouts
