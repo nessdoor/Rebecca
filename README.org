@@ -1,7 +1,6 @@
 #+title: Rebecca
 #+subtitle: An augmented neural conversational agent
 
-* Overview
 Rebecca is a general-purpose, extensible conversational agent built on top of a
 large language model (LLM) for human-like text parsing and generation, supported
 by natural-language processing technologies for reliable automated information
