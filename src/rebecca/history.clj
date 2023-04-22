@@ -1,9 +1,8 @@
 (ns rebecca.history
   (:require [clojure.spec.alpha :as s]
+            [java-time.api :as jt]
             [rebecca.seq :refer [queue pop-drop]]
-            [rebecca.history-spec])
-  (:import (java.time DateTimeException Instant)
-           java.time.temporal.ChronoUnit))
+            [rebecca.history-spec]))
 
 (defn message
   "Creates a message containing the given text. Optionally, a message
@@ -12,7 +11,7 @@
   timestamp corresponding to the instant when it was created, and will
   specify no speaker."
   [text & {:keys [timestamp speaker] :as opts
-           :or {timestamp (Instant/now)}}]
+           :or {timestamp (jt/instant)}}]
   {:post [(s/valid? :rebecca/message %)]}
   (merge {:text text :timestamp timestamp}
          (if speaker {:speaker speaker})))
@@ -49,7 +48,9 @@
           (s/valid? (s/* :rebecca/message) cs)
           (let [end (:end-time hist)
                 time (:timestamp (first cs))]
-            (or (nil? end) (= end time) (.isBefore end time)))]
+            (or (nil? end) (jt/not-before?
+                            (jt/instant time)
+                            (jt/instant end))))]
     :post [(s/valid? :rebecca/history %)
            (= (:messages %)
               (concat (:messages hist) cs))]}
@@ -86,8 +87,8 @@
           (let [{lend :end-time} l
                 {rbeg :start-time} r]
             (or (nil? lend) (nil? rbeg)
-                (= lend rbeg)
-                (.isBefore lend rbeg)))]
+                (jt/not-before? (jt/instant rbeg)
+                                (jt/instant lend))))]
     :post [(s/valid? :rebecca/history %)
            (= (:messages %)
               (concat (:messages l) (:messages r)))]}

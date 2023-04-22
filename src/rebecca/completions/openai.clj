@@ -2,10 +2,9 @@
   (:require [clojure.string :as cstr]
             [cheshire.core :as chc]
             [wkok.openai-clojure.api :as oai]
+            [java-time.api :as jt]
             [rebecca.history :as rh]
-            [rebecca.completions.common :as cc])
-  (:import java.time.Instant
-           java.time.temporal.ChronoUnit))
+            [rebecca.completions.common :as cc]))
 
 (def default-parameters {:temperature 0})
 
@@ -64,7 +63,7 @@
 
 (defn davinci-3-complete
   [agent-name messages & {:as model-params}]
-  (let [ctime (Instant/now)
+  (let [ctime (jt/instant)
         header (cc/msg-header agent-name ctime) ; Stimulates response from model
         response (oai/create-completion
                   (merge
@@ -94,8 +93,7 @@
 
 (defn system-time-msg [time]
   {:role "system"
-   :content (format "Time:%s"
-                    (.truncatedTo time ChronoUnit/SECONDS))})
+   :content (format "Time:%s" (jt/truncate-to time :seconds))})
 
 (defn gpt-35-chat-format
   [ctxt]
@@ -115,7 +113,7 @@
 
 (defn gpt-35-chat-complete
   [agent-name messages & {:as model-params}]
-  (let [ctime (Instant/now)
+  (let [ctime (jt/instant)
         response (oai/create-chat-completion
                 (merge
                  default-parameters

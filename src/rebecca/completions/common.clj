@@ -1,9 +1,8 @@
 (ns rebecca.completions.common
   (:require [clojure.string :as cstr]
             [clojure.spec.alpha :as s]
-            [rebecca.history :as h])
-  (:import java.time.Instant
-           java.time.temporal.ChronoUnit))
+            [java-time.api :as jt]
+            [rebecca.history :as h]))
 
 (def default-token-estimator (fn [seg-text]
                                (* 3 (count (cstr/split seg-text #"\s+")))))
@@ -33,9 +32,9 @@
       assoc :tokens final-size))))
 
 (defn msg-header
-  ([speaker] (msg-header speaker (Instant/now)))
+  ([speaker] (msg-header speaker (jt/instant)))
   ([speaker instant]
-   (format "[%s|%s]:" speaker (.truncatedTo instant ChronoUnit/SECONDS))))
+   (format "[%s|%s]:" speaker (jt/truncate-to instant :seconds))))
 
 (defn h-trim
   [h]

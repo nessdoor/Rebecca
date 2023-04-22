@@ -1,6 +1,6 @@
 (ns rebecca.context
-  (:require [rebecca.history :refer [h-concat h-conj]])
-  (:import java.time.Instant))
+  (:require [java-time.api :as jt]
+            [rebecca.history :refer [h-concat h-conj]]))
 
 (def default-speaker "Other")
 
@@ -22,11 +22,11 @@
   (let [{agent :agent :or {agent default-agent}} hist]
     (h-conj hist
             {:text (str agent " knows that: " facts)
-             :timestamp (Instant/now)})))
+             :timestamp (jt/instant)})))
 
 (defn +input
   [hist input & {ctime :timestamp sp :speaker
-                 :or {ctime (Instant/now) sp default-speaker}}]
+                 :or {ctime (jt/instant) sp default-speaker}}]
   (h-conj hist {:speaker (.intern sp)   ; Speaker string is highly-repetitive
                 :text input :timestamp ctime}))
 
