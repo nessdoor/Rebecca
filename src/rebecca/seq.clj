@@ -7,7 +7,7 @@
 
 (defn queue?
   "Returns true if q is a persistent queue."
-  [q] (instance? clojure.lang.PersistentQueue))
+  [q] (instance? clojure.lang.PersistentQueue q))
 
 (defn pop-drop
   "Like clojure.core drop, but repeatedly calling pop on the
