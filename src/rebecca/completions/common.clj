@@ -11,25 +11,24 @@
 
 (def default-trim-factor 3/4)
 
-(defn- trimming-plan
-  [tokens limit trim-factor]
-  (let [total (reduce + tokens)
-        goal (- total (* limit trim-factor))]
-    (loop [recouped 0, leap 0, residue tokens]
-      (if (< recouped goal)
-        (recur (+ recouped (first residue))
-               (inc leap)
-               (rest residue))
-        [leap (- total recouped) residue]))))
-
 (defn trim-context
   ([ctxt tokens limit]
    (trim-context ctxt tokens limit default-trim-factor))
   ([ctxt tokens limit trim-factor]
-   (let [[leap final-size _] (trimming-plan tokens limit trim-factor)]
+   (let [total (reduce + tokens)              ; Size of context in tokens
+         goal (- total (* limit trim-factor)) ; Target amount of tokens to drop
+         ;; Split partial sums as soon as the goal is reached
+         cuts (partition-by #(> goal %)
+                            ;; Cumulated token count, starting from 0
+                            (reductions + 0 tokens))]
      (vary-meta
-      (h/h-drop leap ctxt)
-      assoc :tokens final-size))))
+      ;; The number of messages to drop is determined as the number of partial
+      ;; sums that fail to reach the target amount
+      (h/h-drop (count (first cuts)) ctxt)
+      ;; The size of the resulting context is equal to the total size of the
+      ;; untrimmed context, minus the partial sum corresponding to the last
+      ;; dropped message
+      assoc :tokens (- total (first (second cuts)))))))
 
 (defn msg-header
   ([speaker] (msg-header speaker (jt/instant)))
