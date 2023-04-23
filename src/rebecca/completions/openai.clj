@@ -23,10 +23,9 @@
 
 (defn gen-reply
   [ctxt backend & {:as model-params}]
-  (let [{agent-name :agent msgs :messages} ctxt
+  (let [{msgs :messages} ctxt
         tokens (:tokens (meta ctxt)     ; Known number of tokens in this context
                         (count msgs))   ; Assume at least 1 token per message
-        fmt ((:formatter backend) ctxt) ; Formatted context
         {:keys [token-limit]} backend]
     (if (> tokens token-limit)
       ;; Trim context if we already know that it is too long
@@ -34,7 +33,7 @@
              backend model-params)
       ;; Else, try generating a reply
       (let [{:keys [reply response error]} ; Reply message, API response and possible error
-            ((:generator backend) agent-name fmt)]
+            ((:generator backend) ctxt)]
         (if error                       ; If we received an error...
           (if (length-exceeded? error)  ; ... and it is an overflow exception...
             (recur (cc/trim-context     ; ... trim history and retry
@@ -60,16 +59,17 @@
     (map #(cc/default-token-estimator %) fmt)))
 
 (defn davinci-3-complete
-  [agent-name messages & {:as model-params}]
+  [ctxt & {:as model-params}]
   (try                                 ; Completion may fail for various reasons
     (let [ctime (jt/instant)
+          {agent-name :agent} ctxt
           header (cc/msg-header agent-name ctime) ; Stimulates response from model
           response (oai/create-completion
                     (merge
                      default-parameters
                      model-params     ; User-supplied parameters
                      {:model "text-davinci-003"
-                      :prompt (cstr/join messages
+                      :prompt (cstr/join (davinci-3-format ctxt)
                                          (list header))}))]
       ;; Return reply message and full API response
       {:reply (rh/message (:text (first (:choices response)))
@@ -105,9 +105,10 @@
     (map #(+ (cc/default-token-estimator (:content %)) 4) fmt)))
 
 (defn gpt-35-chat-complete
-  [agent-name messages & {:as model-params}]
+  [ctxt & {:as model-params}]
   (try                                 ; Completion may fail for various reasons
     (let [ctime (jt/instant)           ; Timestamp of the response message
+          {agent-name :agent} ctxt
           response                     ; API response object
           (oai/create-chat-completion
            (merge default-parameters
@@ -115,7 +116,7 @@
                   {:model "gpt-3.5-turbo"
                    ;; Prompt is the concatenation of history and system time msg
                    :messages
-                   (vec (concat messages
+                   (vec (concat (gpt-35-chat-format ctxt)
                                 (list (system-time-msg ctime))))}))
           ;; Reply message
           completion (:content (:message (first (:choices response))))
