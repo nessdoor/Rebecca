@@ -33,7 +33,7 @@
              backend model-params)
       ;; Else, try generating a reply
       (let [{:keys [reply response error]} ; Reply message, API response and possible error
-            ((:generator backend) ctxt)]
+            (apply (:generator backend) ctxt model-params)]
         (if error                       ; If we received an error...
           (if (length-exceeded? error)  ; ... and it is an overflow exception...
             (recur (cc/trim-context     ; ... trim history and retry
