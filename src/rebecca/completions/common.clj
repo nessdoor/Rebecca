@@ -12,10 +12,11 @@
 (def default-trim-factor 3/4)
 
 (defn trim-context
-  ([ctxt tokens limit]
-   (trim-context ctxt tokens limit default-trim-factor))
-  ([ctxt tokens limit trim-factor]
-   (let [total (reduce + tokens)              ; Size of context in tokens
+  ([ctxt measure limit]
+   (trim-context ctxt measure limit default-trim-factor))
+  ([ctxt measure limit trim-factor]
+   (let [tokens (measure ctxt)                ; messages -> tokens in messages
+         total (reduce + tokens)              ; Size of context in tokens
          goal (- total (* limit trim-factor)) ; Target amount of tokens to drop
          ;; Split partial sums as soon as the goal is reached
          cuts (partition-by #(> goal %)

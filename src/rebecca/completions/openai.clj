@@ -24,15 +24,13 @@
 (defn gen-reply
   [ctxt backend & {:as model-params}]
   (let [{agent-name :agent msgs :messages} ctxt
-        tokens (:tokens (meta ctxt)     ; Equivalent tokens of the context
-                        (count msgs))   ; (At least 1 token per message)
-        fmt ((:formatter backend) ctxt) ; Formatted text messages
-        msgs-tokens                     ; Tokens of each message
-        ((:tokenizer backend) fmt)
+        tokens (:tokens (meta ctxt)     ; Known number of tokens in this context
+                        (count msgs))   ; Assume at least 1 token per message
+        fmt ((:formatter backend) ctxt) ; Formatted context
         {:keys [token-limit]} backend]
     (if (> tokens token-limit)
       ;; Trim context if we already know that it is too long
-      (recur (cc/trim-context ctxt msgs-tokens token-limit)
+      (recur (cc/trim-context ctxt (:tokenizer backend) token-limit)
              backend model-params)
       ;; Else, try generating a reply
       (let [{:keys [reply response error]} ; Reply message, API response and possible error
@@ -40,7 +38,7 @@
         (if error                       ; If we received an error...
           (if (length-exceeded? error)  ; ... and it is an overflow exception...
             (recur (cc/trim-context     ; ... trim history and retry
-                    ctxt msgs-tokens token-limit)
+                    ctxt (:tokenizer backend) token-limit)
                    backend model-params)
             (throw error))              ; Re-throw any other exception
           ;; If no error happened, return reply message and extended context
@@ -57,7 +55,9 @@
     (concat (list pre) (map k msgs))))
 
 (defn davinci-3-tokenize
-  [fmt] (map #(cc/default-token-estimator %) fmt))
+  [ctxt]
+  (let [fmt (davinci-3-format ctxt)]
+    (map #(cc/default-token-estimator %) fmt)))
 
 (defn davinci-3-complete
   [agent-name messages & {:as model-params}]
@@ -88,9 +88,8 @@
    :content (format "Time:%s" (jt/truncate-to time :seconds))})
 
 (defn gpt-35-chat-format
-  [ctxt]
-  (let [{agent-name :agent pre :preamble msgs :messages} ctxt
-        k (fn [msg]
+  [& {agent-name :agent pre :preamble msgs :messages}]
+  (let [k (fn [msg]
             (let [{:keys [speaker text timestamp] :or {speaker "System"}} msg
                   header (cc/msg-header speaker timestamp)]
               (cond
@@ -101,7 +100,9 @@
             (map k msgs))))
 
 (defn gpt-35-chat-tokenize
-  [fmt] (map #(+ (cc/default-token-estimator (:content %)) 4) fmt))
+  [ctxt]
+  (let [fmt (gpt-35-chat-format ctxt)]
+    (map #(+ (cc/default-token-estimator (:content %)) 4) fmt)))
 
 (defn gpt-35-chat-complete
   [agent-name messages & {:as model-params}]
