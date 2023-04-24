@@ -1,10 +1,13 @@
 (ns rebecca.completions.openai
   (:require [clojure.string :as cstr]
             [cheshire.core :as chc]
+            [clojure.core.cache.wrapped :as wcache]
             [wkok.openai-clojure.api :as oai]
             [java-time.api :as jt]
             [rebecca.history :as rh]
             [rebecca.completions.common :as cc]))
+
+;;; Model-agnostic logic
 
 (def default-parameters {:temperature 0})
 
@@ -47,11 +50,28 @@
             ;; Remember token count of resulting context for future overflow tests
             assoc :tokens (get-in response [:usage :total_tokens]))])))))
 
+(def formatted-context-cache (wcache/fifo-cache-factory {} :threshold 3))
+(def formatted-message-cache (wcache/fifo-cache-factory {}))
+
+;;; Model-specific logic
+
+;;; text-davinci-003
+
 (defn davinci-3-format
-  [& {pre :preamble msgs :messages}]
-  (let [k (fn [{:keys [speaker timestamp text] :or {speaker "System"}}]
-            (str (cc/msg-header speaker timestamp) text))]
-    (concat (list pre) (map k msgs))))
+  [& {pre :preamble msgs :messages :as ctxt}]
+  (wcache/lookup-or-miss
+   ;; Cache final result of the formatting
+   formatted-context-cache [ctxt :davinci-3]
+   (fn [_]
+     (let [k (fn [{:keys [speaker timestamp text]
+                   :or {speaker "System"}
+                   :as msg}]
+               ;; Cache per-message expansion
+               (wcache/lookup-or-miss
+                formatted-message-cache [msg :davinci-3]
+                (fn [_]
+                  (str (cc/msg-header speaker timestamp) text))))]
+       (concat (list pre) (map k msgs))))))
 
 (defn davinci-3-tokenize
   [ctxt]
@@ -83,21 +103,31 @@
    :generator davinci-3-complete
    :token-limit 4097})
 
+;;; gpt-3.5-turbo
+
 (defn system-time-msg [time]
   {:role "system"
    :content (format "Time:%s" (jt/truncate-to time :seconds))})
 
 (defn gpt-35-chat-format
-  [& {agent-name :agent pre :preamble msgs :messages}]
-  (let [k (fn [msg]
-            (let [{:keys [speaker text timestamp] :or {speaker "System"}} msg
-                  header (cc/msg-header speaker timestamp)]
-              (cond
-                (= agent-name speaker) {:role "assistant" :content (str header text)}
-                (nil? speaker) {:role "system" :content (str header text)}
-                :else {:role "user" :content (str header text)})))]
-    (concat (list {:role "assistant" :content pre})
-            (map k msgs))))
+  [& {agent-name :agent pre :preamble msgs :messages :as ctxt}]
+   ;; Cache final result of the formatting
+  (wcache/lookup-or-miss
+   formatted-context-cache [ctxt :gpt-35]
+   (fn [_]
+     (let [k (fn [msg]
+               ;; Cache per-message expansion
+               (wcache/lookup-or-miss
+                formatted-message-cache [msg :gpt-35]
+                (fn [_]
+                  (let [{:keys [speaker text timestamp] :or {speaker "System"}} msg
+                        header (cc/msg-header speaker timestamp)]
+                    (cond
+                      (= agent-name speaker) {:role "assistant" :content (str header text)}
+                      (nil? speaker) {:role "system" :content (str header text)}
+                      :else {:role "user" :content (str header text)})))))]
+       (concat (list {:role "assistant" :content pre})
+               (map k msgs))))))
 
 (defn gpt-35-chat-tokenize
   [ctxt]
