@@ -58,19 +58,20 @@
 ;;; text-davinci-003
 
 (defn davinci-3-format
-  [& {pre :preamble msgs :messages :as ctxt}]
+  [ctxt]
   (wcache/lookup-or-miss
    ;; Cache final result of the formatting
    formatted-context-cache [ctxt :davinci-3]
-   (fn [_]
-     (let [k (fn [{:keys [speaker timestamp text]
-                   :or {speaker "System"}
-                   :as msg}]
+   (fn [[ctxt _]]                       ; Ignore backend tag
+     (let [{pre :preamble msgs :messages} ctxt
+           k (fn [msg]
                ;; Cache per-message expansion
                (wcache/lookup-or-miss
                 formatted-message-cache [msg :davinci-3]
-                (fn [_]
-                  (str (cc/msg-header speaker timestamp) text))))]
+                (fn [[msg _]]           ; Ignore backend tag
+                  (let  [{:keys [speaker timestamp text]
+                          :or {speaker "System"}} msg]
+                    (str (cc/msg-header speaker timestamp) text)))))]
        (concat (list pre) (map k msgs))))))
 
 (defn davinci-3-tokenize
@@ -110,16 +111,17 @@
    :content (format "Time:%s" (jt/truncate-to time :seconds))})
 
 (defn gpt-35-chat-format
-  [& {agent-name :agent pre :preamble msgs :messages :as ctxt}]
+  [ctxt]
    ;; Cache final result of the formatting
   (wcache/lookup-or-miss
    formatted-context-cache [ctxt :gpt-35]
-   (fn [_]
-     (let [k (fn [msg]
+   (fn [[ctxt _]]                       ; Ignore backend tag
+     (let [{agent-name :agent pre :preamble msgs :messages} ctxt
+           k (fn [msg]
                ;; Cache per-message expansion
                (wcache/lookup-or-miss
                 formatted-message-cache [msg :gpt-35]
-                (fn [_]
+                (fn [[msg _]]           ; Ignore backend tag
                   (let [{:keys [speaker text timestamp] :or {speaker "System"}} msg
                         header (cc/msg-header speaker timestamp)]
                     (cond
