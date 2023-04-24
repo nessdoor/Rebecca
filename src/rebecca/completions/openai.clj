@@ -53,6 +53,9 @@
 (def formatted-context-cache (wcache/fifo-cache-factory {} :threshold 3))
 (def formatted-message-cache (wcache/fifo-cache-factory {}))
 
+(defn- with-backend-key [e k] [e k])
+(defn- unwrap-backend-key [f e] (f (first e)))
+
 ;;; Model-specific logic
 
 ;;; text-davinci-003
@@ -61,14 +64,16 @@
   [ctxt]
   (wcache/lookup-or-miss
    ;; Cache final result of the formatting
-   formatted-context-cache [ctxt :davinci-3]
-   (fn [[ctxt _]]                       ; Ignore backend tag
+   formatted-context-cache (with-backend-key ctxt :davinci-3)
+   unwrap-backend-key
+   (fn [ctxt]
      (let [{pre :preamble msgs :messages} ctxt
            k (fn [msg]
                ;; Cache per-message expansion
                (wcache/lookup-or-miss
-                formatted-message-cache [msg :davinci-3]
-                (fn [[msg _]]           ; Ignore backend tag
+                formatted-message-cache (with-backend-key msg :davinci-3)
+                unwrap-backend-key
+                (fn [msg]
                   (let  [{:keys [speaker timestamp text]
                           :or {speaker "System"}} msg]
                     (str (cc/msg-header speaker timestamp) text)))))]
@@ -114,14 +119,16 @@
   [ctxt]
    ;; Cache final result of the formatting
   (wcache/lookup-or-miss
-   formatted-context-cache [ctxt :gpt-35]
-   (fn [[ctxt _]]                       ; Ignore backend tag
+   formatted-context-cache (with-backend-key ctxt :gpt-35)
+   unwrap-backend-key
+   (fn [ctxt]
      (let [{agent-name :agent pre :preamble msgs :messages} ctxt
            k (fn [msg]
                ;; Cache per-message expansion
                (wcache/lookup-or-miss
-                formatted-message-cache [msg :gpt-35]
-                (fn [[msg _]]           ; Ignore backend tag
+                formatted-message-cache (with-backend-key msg :gpt-35)
+                unwrap-backend-key
+                (fn [msg]
                   (let [{:keys [speaker text timestamp] :or {speaker "System"}} msg
                         header (cc/msg-header speaker timestamp)]
                     (cond
