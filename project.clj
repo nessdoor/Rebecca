@@ -11,6 +11,7 @@
                  [com.h2database/h2 "1.4.200"]
                  [com.xtdb/xtdb-core "1.23.3"]
                  [com.xtdb/xtdb-jdbc "1.23.3"]
+                 [meander/epsilon "0.0.650"]
                  [net.clojars.wkok/openai-clojure "0.5.0"]
                  [telegrambot-lib "2.5.0"]]
   :profiles {:dev {:dependencies [[org.clojure/test.check "1.1.1"]]}}
