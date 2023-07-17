@@ -60,13 +60,19 @@
                           :as ?message}
                 (let [u-uri (userid->uri ?uid)
                       c-uri (chatid->uri ?cid)
-                      m-uri (msg->uri ?cid ?mid)]
+                      m-uri (msg->uri ?cid ?mid)
+                      timestamp (-> ?date
+                                    (jt/seconds)
+                                    (jt/as :millis)
+                                    (jt/instant))]
                   [(assoc ?speaker
                           :type :org.telegram/user
-                          :id u-uri)
+                          :id u-uri
+                          :timestamp timestamp)
                    (assoc ?source
                           :type :org.telegram/chat
-                          :id c-uri)
+                          :id c-uri
+                          :timestamp timestamp)
                    (-> ?message
                        (dissoc :org.telegram/text :org.telegram/date)
                        (assoc :type :org.telegram/message
@@ -74,10 +80,7 @@
                               :speaker u-uri
                               :source c-uri
                               :text ?text
-                              :date (-> ?date
-                                        (jt/seconds)
-                                        (jt/as :millis)
-                                        (jt/instant))
+                              :timestamp timestamp
                               :org.telegram/from ?uid
                               :org.telegram/chat ?cid))]))))))
 
