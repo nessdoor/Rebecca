@@ -33,17 +33,19 @@
 
 (defn chatid->uri [chat-id]
   (URI. "news" authority (str "/" chat-id "/") nil nil))
-(defmethod msg/object-id :org.telegram/chat [c] (chatid->uri c))
+(defmethod msg/object-id :org.telegram/chat
+  [c] (chatid->uri (:org.telegram/id c)))
 
 (defn msg->uri [chat-id msg-id]
   (.resolve (chatid->uri chat-id) (URI. (str msg-id))))
 (defmethod msg/object-id :org.telegram/message
-  [m] (msg->uri (chatid->uri (:org.telegram/chat m))
+  [m] (msg->uri (chatid->uri (:org.telegram/from m))
                 (:org.telegram/message_id m)))
 
 (defn userid->uri [user-id]
   (URI. "acct" (str user-id "@" authority) nil))
-(defmethod msg/object-id :org.telegram/user [u] (userid->uri u))
+(defmethod msg/object-id :org.telegram/user
+  [u] (userid->uri (:org.telegram/id u)))
 
 (def xf-fractionate-normalize
   (map
