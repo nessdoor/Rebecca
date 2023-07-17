@@ -5,7 +5,8 @@
             [java-time.api :as jt]
             [meander.epsilon :as m]
             [telegrambot-lib.core :as tbot]
-            [rebecca.message :as msg])
+            [rebecca.message :as msg]
+            [rebecca.update-bus :as bus])
   (:import java.net.URI))
 
 ;; TODO: implement proper dispatching based on type of update
@@ -87,6 +88,8 @@
    xf-fractionate-normalize))
 
 (def intake-ch (chan 1 xf-update-pipeline clojure.pprint/pprint))
+
+(bus/connect-to-intake intake-ch)
 
 (def known-updates
   "Cache for storing the ID of updates that we have already received. It
