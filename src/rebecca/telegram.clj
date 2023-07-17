@@ -48,6 +48,9 @@
 (defmethod msg/object-id :org.telegram/user
   [u] (userid->uri (:org.telegram/id u)))
 
+(defn- with-time-meta [o t]
+  (vary-meta o assoc :timestamp t))
+
 (def xf-fractionate-normalize
   (map
    #(update % 1
@@ -65,14 +68,14 @@
                                     (jt/seconds)
                                     (jt/as :millis)
                                     (jt/instant))]
-                  [(assoc ?speaker
-                          :type :org.telegram/user
-                          :id u-uri
-                          :timestamp timestamp)
-                   (assoc ?source
-                          :type :org.telegram/chat
-                          :id c-uri
-                          :timestamp timestamp)
+                  [(-> (assoc ?speaker
+                              :type :org.telegram/user
+                              :id u-uri)
+                       (with-time-meta timestamp))
+                   (-> (assoc ?source
+                              :type :org.telegram/chat
+                              :id c-uri)
+                       (with-time-meta timestamp))
                    (-> ?message
                        (dissoc :org.telegram/text :org.telegram/date)
                        (assoc :type :org.telegram/message
@@ -82,7 +85,8 @@
                               :text ?text
                               :timestamp timestamp
                               :org.telegram/from ?uid
-                              :org.telegram/chat ?cid))]))))))
+                              :org.telegram/chat ?cid)
+                       (with-time-meta timestamp))]))))))
 
 (def xf-update-pipeline
   (comp
