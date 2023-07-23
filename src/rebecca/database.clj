@@ -110,31 +110,35 @@
 
 (bus/tap-update-stream live-upd-chan)
 
-(def commission-signaler (agent {}))
+(def tx-comm-ch (async/chan))
 
-(defn signal-tx-committed [state tx]
-  (let [tx-id (::xt/tx-id tx)]
-    (if-let [ack-chan (get state tx-id)]
-      (do
-        (>!! ack-chan (:committed? tx false))
-        (dissoc state tx-id))
-      state)))
+(def tx-expect-ch (async/chan))
 
-(defn expect-tx-committed [state ack-chan tx]
-  (try
-    (>!! ack-chan (xt/tx-committed? db tx))
-    state
-    (catch xtdb.api.NodeOutOfSyncException _
-      (assoc state (::xt/tx-id tx) ack-chan))))
+(def commission-signaler
+  (async/go-loop [state {}]
+    (recur
+     (async/alt!
+       tx-comm-ch ([tx _]
+                   (let [tx-id (::xt/tx-id tx)]
+                     (if-let [ack-chan (get state tx-id)]
+                       (do
+                         (>! ack-chan (:committed? tx false))
+                         (dissoc state tx-id))
+                       state)))
+       tx-expect-ch ([[ack-chan tx] _]
+                     (try
+                       (>! ack-chan (xt/tx-committed? db tx))
+                       state
+                       (catch xtdb.api.NodeOutOfSyncException _
+                         (assoc state (::xt/tx-id tx) ack-chan))))))))
 
 (def tx-comm-listener
   (xt/listen db {::xt/event-type ::xt/indexed-tx}
-             #(send commission-signaler signal-tx-committed %)))
+             #(>!! tx-comm-ch %)))
 
 (def transactor (async/go-loop []
                   (let [[ack-chan tx-ops] (<! live-upd-chan)
                         tx (xt/submit-tx db tx-ops)]
                     (when ack-chan
-                      (send commission-signaler
-                            expect-tx-committed ack-chan tx))
+                      (>! tx-expect-ch [ack-chan tx]))
                     (recur))))
