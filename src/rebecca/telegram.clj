@@ -1,6 +1,7 @@
 (ns rebecca.telegram
-  (:require [clojure.core.async :refer [>!! <!! chan]]
+  (:require [clojure.core.async :as async :refer [>!! <!!]]
             [clojure.core.cache.wrapped :as c]
+            [clojure.string :as str]
             [clojure.walk :as w]
             [java-time.api :as jt]
             [meander.epsilon :as m]
@@ -37,16 +38,29 @@
 (defmethod msg/object-id :org.telegram/chat
   [c] (chatid->uri (:org.telegram/id c)))
 
+(defn uri->chat-id [u]
+  (let [[_ c] (str/split (.getPath u) #"/")]
+    (parse-long c)))
+
 (defn msg->uri [chat-id msg-id]
   (.resolve (chatid->uri chat-id) (URI. (str msg-id))))
 (defmethod msg/object-id :org.telegram/message
   [m] (msg->uri (chatid->uri (:org.telegram/from m))
                 (:org.telegram/message_id m)))
 
+(defn uri->msg-chat-id [u]
+  (let [[_ c m] (str/split (.getPath u) #"/")]
+    [(parse-long c)
+     (parse-long m)]))
+
 (defn userid->uri [user-id]
   (URI. "acct" (str user-id "@" authority) nil))
 (defmethod msg/object-id :org.telegram/user
   [u] (userid->uri (:org.telegram/id u)))
+
+(defn uri->user-id [u]
+  (let [[u _] (str/split (.getSchemeSpecificPart u) #"@")]
+    (parse-long u)))
 
 (defn- with-time-meta [o t]
   (vary-meta o assoc :timestamp t))
@@ -94,7 +108,7 @@
    xf-qualify-map
    xf-fractionate-normalize))
 
-(def intake-ch (chan 1 xf-update-pipeline clojure.pprint/pprint))
+(def intake-ch (async/chan 1 xf-update-pipeline clojure.pprint/pprint))
 
 (bus/connect-to-intake intake-ch)
 
@@ -105,7 +119,7 @@
   after 1 week."
   (c/ttl-cache-factory {} :ttl (* 5 60 1000))) ; TTL = 5 minutes
 
-(def multiup-ack-ch (chan))
+(def multiup-ack-ch (async/chan))
 
 (defn ingest-updates [ups]
   (let [new (vec (remove #(c/lookup known-updates (:update_id %)) ups))
@@ -140,3 +154,15 @@
            (recur (+ 1 (ingest-updates updates))))
          (do (prn "Error: " response)
              (recur last-update)))))))
+
+(defn reply-to [msg other-id & {:as options}]
+  (async/pipe
+   (async/thread
+     (let [[chat-id reply-to-id] (uri->msg-chat-id other-id)
+           reply {:chat_id chat-id
+                  :reply_to_message_id reply-to-id
+                  :text (:text msg)}]
+       [nil
+        (-> (tbot/send-message bot (merge options reply))
+            (update-keys #(if (= % :result) :message %)))]))
+   intake-ch false))
