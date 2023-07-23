@@ -134,6 +134,7 @@
 (def transactor (async/go-loop []
                   (let [[ack-chan tx-ops] (<! live-upd-chan)
                         tx (xt/submit-tx db tx-ops)]
-                    (send commission-signaler
-                          expect-tx-committed ack-chan tx)
+                    (when ack-chan
+                      (send commission-signaler
+                            expect-tx-committed ack-chan tx))
                     (recur))))
